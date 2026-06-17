@@ -9,8 +9,8 @@ class Config:
     embed_model: str = "all-MiniLM-L6-v2"
 
     ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1"
-    top_k: int = 3
+    ollama_model: str = "llama3.2"
+    top_k: int = 5
 
     pdf_dir: Path = Path("GateBooks")
     chunk_size: int = 512

@@ -37,19 +37,15 @@ export async function* askStream(question: string) {
 
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
-      const data = JSON.parse(line.slice(6));
-      if (data.type === "done") return;
-      yield data;
+      const payload = line.slice(6).trim();
+      if (!payload) continue;
+      try {
+        const data = JSON.parse(payload);
+        if (data.type === "done") return;
+        yield data;
+      } catch {
+        // skip malformed JSON lines that span chunk boundaries
+      }
     }
   }
-}
-
-export async function searchQuery(query: string, k = 3) {
-  const res = await fetch(`${BASE}/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, k }),
-  });
-  if (!res.ok) throw new Error((await res.json()).detail);
-  return res.json() as Promise<{ results: { score: number; chunk: string; metadata: Record<string, unknown>; index: number }[] }>;
 }

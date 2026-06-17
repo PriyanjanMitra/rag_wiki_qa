@@ -24,7 +24,7 @@ class VectorRepository:
         with open(self.index_dir / "metadata.pkl", "rb") as f:
             self.metadata = pickle.load(f)
 
-        self.embedder = SentenceTransformer(embed_model)
+        self.embedder = SentenceTransformer(embed_model, local_files_only=True)
         self._executor = ThreadPoolExecutor(max_workers=1)
 
         logger.info("Repository loaded: %s chunks, dim=%s", self.index.ntotal, self.index.d)

@@ -9,7 +9,7 @@ from repository import VectorRepository
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = "You are a helpful teaching assistant. Answer the question based ONLY on the provided context. If the context doesn't contain enough information, say so clearly."
+SYSTEM_PROMPT = "You are a helpful teaching assistant. Answer the question based ONLY on the provided context. Provide a thorough, detailed answer and explain concepts clearly. If the context doesn't contain enough information, say so clearly."
 
 
 class RAGService:
@@ -27,7 +27,7 @@ class RAGService:
         )
         self.ollama_url = (ollama_url or config.ollama_url).rstrip("/")
         self.ollama_model = ollama_model or config.ollama_model
-        self.top_k = top_k or config.top_k
+        self.top_k = top_k if top_k is not None else config.top_k
 
     def ask(self, question: str) -> dict:
         results = self.repository.search(question, k=self.top_k)
@@ -56,7 +56,7 @@ Answer:"""
                 {
                     "source": r["metadata"].get("source", "unknown"),
                     "score": r["score"],
-                    "excerpt": r["chunk"][:300],
+                    "excerpt": r["chunk"][:600],
                 }
                 for r in results
             ],
@@ -95,7 +95,7 @@ Answer:"""
                 {
                     "source": r["metadata"].get("source", "unknown"),
                     "score": r["score"],
-                    "excerpt": r["chunk"][:300],
+                    "excerpt": r["chunk"][:600],
                 }
                 for r in results
             ],
@@ -108,7 +108,7 @@ Answer:"""
             {
                 "source": r["metadata"].get("source", "unknown"),
                 "score": r["score"],
-                "excerpt": r["chunk"][:300],
+                "excerpt": r["chunk"][:600],
             }
             for r in results
         ]
@@ -147,7 +147,7 @@ Answer:"""
                         logger.warning("Failed to decode Ollama line: %s", line[:100])
 
     def search(self, query: str, k: int | None = None) -> list:
-        return self.repository.search(query, k=k or self.top_k)
+        return self.repository.search(query, k=k if k is not None else self.top_k)
 
     async def search_async(self, query: str, k: int | None = None) -> list:
-        return await self.repository.search_async(query, k=k or self.top_k)
+        return await self.repository.search_async(query, k=k if k is not None else self.top_k)
