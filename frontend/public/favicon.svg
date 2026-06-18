@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <!-- Dark mode: cool blue -->
+    <linearGradient id="glass-dark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a8ad9"/>
+      <stop offset="40%" stop-color="#2a5db0"/>
+      <stop offset="100%" stop-color="#1a4a94"/>
+    </linearGradient>
+    <!-- Light mode: warm orange -->
+    <linearGradient id="glass-light" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5b040"/>
+      <stop offset="40%" stop-color="#e08020"/>
+      <stop offset="100%" stop-color="#d07010"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.45)"/>
+      <stop offset="50%" stop-color="rgba(255,255,255,0.05)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.15)"/>
+    </linearGradient>
+    <style>
+      @media (prefers-color-scheme: light) {
+        .bg { fill: url(#glass-light); stroke: #b06010; }
+      }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: url(#glass-dark); stroke: #1565a8; }
+      }
+    </style>
+  </defs>
+  <rect class="bg" width="32" height="32" rx="5" stroke-width="0.5"/>
+  <rect width="32" height="16" rx="5" fill="url(#shine)"/>
+  <rect x="0" y="0" width="32" height="16" rx="5" fill="rgba(255,255,255,0.08)"/>
+  <text x="16" y="23" font-family="Segoe UI, system-ui, sans-serif" font-size="17" font-weight="700" fill="white" text-anchor="middle" style="text-shadow: 0 1px 2px rgba(0,0,0,0.5)">R</text>
+</svg>
