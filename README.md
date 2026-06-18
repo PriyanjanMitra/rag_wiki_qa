@@ -35,7 +35,7 @@ A local Retrieval-Augmented Generation (RAG) system that answers questions from 
 │  └────┬─────┘  └──────────┘  └──────────┘  └────────────┘  │
 │       │                                                     │
 └───────┼─────────────────────────────────────────────────────┘
-        │ POST /ask, /ask/stream, /health
+        │ POST /ask, /health
         │ (Vite proxy → localhost:8000)
         ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -44,12 +44,12 @@ A local Retrieval-Augmented Generation (RAG) system that answers questions from 
 │                                                             │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  route/api.py                                         │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐            │  │
-│  │  │ /health  │  │ /ask     │  │/ask/stream│           │  │
-│  │  │   GET    │  │   POST   │  │   POST   │            │  │
-│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘            │  │
-│  └───────┼─────────────┼─────────────┼───────────────────┘  │
-│          ▼             ▼             ▼                       │
+│  │  ┌──────────┐  ┌──────────┐                           │  │
+│  │  │ /health  │  │ /ask     │                           │  │
+│  │  │   GET    │  │   POST   │                           │  │
+│  │  └────┬─────┘  └────┬─────┘                           │  │
+│  └───────┼─────────────┼──────────────────────────────────┘  │
+│          ▼             ▼                                      │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  service/rag_service.py                               │  │
 │  │  RAGService: orchestrates retrieval + generation      │  │
@@ -73,7 +73,6 @@ Pipeline (one-time build):
 ## Features
 
 - **RAG Q&A** — Ask questions about your PDF textbooks; retrieves relevant chunks via FAISS similarity search and generates answers using Ollama LLMs.
-- **Streaming responses** — Token-by-token streaming via Server-Sent Events (SSE) for real-time answer generation.
 - **Source attribution** — Every answer shows which textbook and passage the information came from, with similarity scores.
 - **Windows 7 Aero UI** — Glassmorphism design with animated background blobs, gradient title bars, themed to orange/warm in light mode and blue/cool in dark mode.
 - **Dark / light mode** — Persisted preference with system default detection.
@@ -162,7 +161,7 @@ rag_wiki_qa/
 │
 ├── route/
 │   ├── __init__.py
-│   └── api.py                # FastAPI routes (health, ask, ask/stream, search)
+│   └── api.py                # FastAPI routes (health, ask, search)
 │
 ├── service/
 │   ├── __init__.py
@@ -195,7 +194,7 @@ rag_wiki_qa/
         ├── main.tsx           # React entry point
         ├── App.tsx            # Main UI component
         ├── App.css            # Tailwind import + theme
-        ├── api.ts             # API client (fetch + SSE streaming)
+        ├── api.ts             # API client (fetch)
         └── vite-env.d.ts      # TypeScript declarations
 ```
 
@@ -205,7 +204,6 @@ rag_wiki_qa/
 |----------|--------|-------------|
 | `/health` | GET | Returns index status (size, dimension) |
 | `/ask` | POST | Ask a question, get answer + sources |
-| `/ask/stream` | POST | Ask a question, stream answer via SSE |
 | `/search` | POST | Search the index directly (raw results) |
 
 ### POST /ask
@@ -225,20 +223,6 @@ rag_wiki_qa/
     }
   ]
 }
-```
-
-### POST /ask/stream
-
-Same request body. Streams SSE events:
-
-```
-data: {"type":"context","sources":[...]}
-
-data: {"type":"token","content":"A"}
-
-data: {"type":"token","content":" hash"}
-
-data: {"type":"done"}
 ```
 
 ## Pipeline: Building the Index
@@ -262,7 +246,6 @@ python -m pipeline.build_index
 |---------|-------------|-----|
 | `Ollama` errors | Ollama not running or wrong model | `ollama serve`, verify model with `ollama list`, update `config.py` |
 | Backend hangs on first request | SentenceTransformer model downloading | Ensure model is cached; set `local_files_only=True` |
-| No answers from streaming | Ollama unreachable or model mismatch | Check `ollama_url` and `ollama_model` in `config.py` |
 | Frontend shows blank page | Backend not running | Start backend on port 8000 |
 | Vite proxy errors | Backend not running on port 8000 | `python main.py` or `python run.py` |
 | `pip install` fails | Conflicting pinned versions | Try `pip install -r requirements.txt --no-deps` or create fresh venv |

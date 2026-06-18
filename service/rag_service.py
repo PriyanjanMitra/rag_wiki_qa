@@ -1,4 +1,3 @@
-import json
 import logging
 from pathlib import Path
 
@@ -100,51 +99,6 @@ Answer:"""
                 for r in results
             ],
         }
-
-    async def ask_stream(self, question: str):
-        results = await self.repository.search_async(question, k=self.top_k)
-
-        sources = [
-            {
-                "source": r["metadata"].get("source", "unknown"),
-                "score": r["score"],
-                "excerpt": r["chunk"][:600],
-            }
-            for r in results
-        ]
-        yield {"type": "context", "sources": sources}
-
-        if not results:
-            yield {"type": "token", "content": "I couldn't find any relevant information to answer that question."}
-            return
-
-        context = "\n\n".join(r["chunk"] for r in results)
-
-        prompt = f"""{SYSTEM_PROMPT}
-
-Context:
-{context}
-
-Question: {question}
-Answer:"""
-
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream(
-                "POST",
-                f"{self.ollama_url}/api/generate",
-                json={"model": self.ollama_model, "prompt": prompt, "stream": True},
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                        token = data.get("response", "")
-                        if token:
-                            yield {"type": "token", "content": token}
-                    except json.JSONDecodeError:
-                        logger.warning("Failed to decode Ollama line: %s", line[:100])
 
     def search(self, query: str, k: int | None = None) -> list:
         return self.repository.search(query, k=k if k is not None else self.top_k)

@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from config import config
@@ -55,7 +55,6 @@ async def root():
         "endpoints": {
             "/health": "GET",
             "/ask": "POST",
-            "/ask/stream": "POST (SSE)",
             "/search": "POST",
         },
     }
@@ -88,24 +87,6 @@ async def ask(body: AskRequest):
     except Exception as e:
         logger.exception("Error processing /ask")
         raise HTTPException(status_code=500, detail=str(e)[:200])
-
-
-@app.post("/ask/stream")
-async def ask_stream(body: AskRequest):
-    if not body.question.strip():
-        raise HTTPException(status_code=400, detail="Question cannot be empty")
-
-    async def event_stream():
-        svc = get_service()
-        try:
-            async for event in svc.ask_stream(body.question):
-                yield f"data: {json.dumps(event)}\n\n"
-            yield "data: {\"type\": \"done\"}\n\n"
-        except Exception as e:
-            logger.exception("Stream error")
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)[:200]})}\n\n"
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.post("/search", response_model=SearchResponse)

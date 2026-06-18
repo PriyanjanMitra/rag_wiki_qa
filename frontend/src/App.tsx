@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { askQuestion, askStream } from "./api";
+import { askQuestion } from "./api";
 import "./App.css";
 
 function getInitialDark(): boolean {
@@ -47,7 +47,6 @@ export default function App() {
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<{ source: string; score: number; excerpt: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const [streaming, setStreaming] = useState(true);
   const [dark, setDark] = useState(getInitialDark);
 
   useEffect(() => {
@@ -61,28 +60,16 @@ export default function App() {
     setAnswer("");
     setSources([]);
 
-    if (streaming) {
-      try {
-        for await (const event of askStream(question)) {
-          if (event.type === "context") setSources(event.sources);
-          else if (event.type === "token") setAnswer((prev) => prev + event.content);
-          else if (event.type === "error") setAnswer(event.content);
-        }
-      } catch (e) {
-        setAnswer(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
-      }
-    } else {
-      try {
-        const result = await askQuestion(question);
-        setAnswer(result.answer);
-        setSources(result.context);
-      } catch (e) {
-        setAnswer(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
-      }
+    try {
+      const result = await askQuestion(question);
+      setAnswer(result.answer);
+      setSources(result.context);
+    } catch (e) {
+      setAnswer(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
 
     setLoading(false);
-  }, [question, streaming]);
+  }, [question]);
 
   return (
     <div className="font-segoe">
@@ -175,29 +162,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Toggle switch */}
-            <label className="inline-flex items-center gap-1.5 mt-1.5 cursor-pointer text-xs text-[#555] dark:text-[#d0d0d0]">
-              <input
-                type="checkbox"
-                checked={streaming}
-                onChange={() => setStreaming((s) => !s)}
-                className="peer sr-only"
-              />
-              <span className="relative w-9 h-[18px] rounded-full border border-black/15 transition-colors
-                bg-black/10
-                peer-checked:bg-[linear-gradient(180deg,#f0a030,#e08020)]
-                after:content-[''] after:absolute after:top-[1px] after:left-[1px]
-                after:w-[14px] after:h-[14px] after:rounded-full
-                after:bg-[linear-gradient(180deg,#f0f0f0,#d0d0d0)]
-                after:border after:border-[#888]
-                after:shadow-[0_1px_2px_rgba(0,0,0,0.3)]
-                after:transition-transform after:duration-200
-                peer-checked:after:translate-x-[18px]
-                dark:border-white/15 dark:bg-black/30
-                dark:peer-checked:bg-[linear-gradient(180deg,#3b9ee0,#1c80c4)]"
-              />
-              Stream response
-            </label>
           </div>
         </div>
 
