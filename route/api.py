@@ -1,9 +1,9 @@
-import json
+import asyncio
 import logging
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -55,6 +55,7 @@ async def root():
         "endpoints": {
             "/health": "GET",
             "/ask": "POST",
+            "/upload": "POST (multipart)",
             "/search": "POST",
         },
     }
@@ -95,3 +96,22 @@ async def search(body: SearchRequest):
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     results = await get_service().search_async(body.query, k=body.k)
     return SearchResponse(results=[SearchResult(**r) for r in results])
+
+
+@app.post("/upload")
+async def upload(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+    tmp = Path(config.index_dir) / f"_upload_{file.filename}"
+    try:
+        content = await file.read()
+        tmp.write_bytes(content)
+        svc = get_service()
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, svc.upload_pdf, tmp)
+        return result
+    except Exception as e:
+        logger.exception("Error processing upload")
+        raise HTTPException(status_code=500, detail=str(e)[:200])
+    finally:
+        tmp.unlink(missing_ok=True)

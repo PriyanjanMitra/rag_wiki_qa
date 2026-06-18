@@ -204,6 +204,7 @@ rag_wiki_qa/
 |----------|--------|-------------|
 | `/health` | GET | Returns index status (size, dimension) |
 | `/ask` | POST | Ask a question, get answer + sources |
+| `/upload` | POST | Upload a PDF (multipart), chunk, embed, and add to index |
 | `/search` | POST | Search the index directly (raw results) |
 
 ### POST /ask
@@ -224,6 +225,23 @@ rag_wiki_qa/
   ]
 }
 ```
+
+### POST /upload
+
+Upload a PDF as `multipart/form-data` with field name `file`:
+
+```bash
+curl -F "file=@mybook.pdf" http://localhost:8000/upload
+```
+
+Response:
+```json
+{ "filename": "mybook.pdf", "chunks": 42, "pages": 15 }
+```
+
+The uploaded PDF is extracted, chunked, embedded, and appended directly to the
+in-memory FAISS index. The updated index is persisted to disk immediately so it
+survives a server restart.
 
 ## Pipeline: Building the Index
 

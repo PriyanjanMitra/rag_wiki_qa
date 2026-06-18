@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { askQuestion } from "./api";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { askQuestion, uploadPdf } from "./api";
 import "./App.css";
 
 function getInitialDark(): boolean {
@@ -32,6 +32,14 @@ function SparkleIcon() {
   );
 }
 
+function UploadIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
+
 function LoadingDots() {
   return (
     <span className="inline-flex gap-0.5 items-center">
@@ -48,6 +56,9 @@ export default function App() {
   const [sources, setSources] = useState<{ source: string; score: number; excerpt: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [dark, setDark] = useState(getInitialDark);
+  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -70,6 +81,25 @@ export default function App() {
 
     setLoading(false);
   }, [question]);
+
+  const handleUpload = useCallback(async () => {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadStatus("");
+    try {
+      const result = await uploadPdf(file);
+      if (result.error) {
+        setUploadStatus(`Error: ${result.error}`);
+      } else {
+        setUploadStatus(`Indexed "${result.filename}" — ${result.chunks} chunk(s), ${result.pages} page(s)`);
+      }
+    } catch (e) {
+      setUploadStatus(`Upload failed: ${e instanceof Error ? e.message : "Unknown error"}`);
+    }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }, []);
 
   return (
     <div className="font-segoe">
@@ -162,6 +192,82 @@ export default function App() {
               </button>
             </div>
 
+          </div>
+        </div>
+
+        {/* Upload card */}
+        <div className="mb-2 overflow-hidden rounded-lg
+          bg-white/60 backdrop-blur-2xl saturate-150 border border-white/80
+          shadow-[0_4px_24px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]
+          dark:bg-white/8 dark:border-white/15
+          dark:shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]"
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5
+            bg-[linear-gradient(180deg,#6fcf97,#27ae60_15%,#1e8449_50%,#1e8449_85%,#27ae60)]
+            dark:bg-[linear-gradient(180deg,#3b7dd8,#2a5db0_15%,#1a4a94_50%,#1a4a94_85%,#2a5db0)]"
+          >
+            <span className="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]"
+              style={{ background: "linear-gradient(180deg, #6fcf97, #27ae60)" }}
+            />
+            <UploadIcon />
+            <span className="text-xs font-semibold text-white tracking-wide [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">
+              Upload PDF
+            </span>
+          </div>
+          <div className="p-3">
+            <p className="text-[11px] text-[#888] dark:text-[#a0c8e8] mb-1.5">
+              Add a PDF to the index so it can be searched and used for answers
+            </p>
+            <div className="flex gap-2 items-center">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf"
+                disabled={uploading}
+                className="flex-1 text-xs text-[#1a1a1a] dark:text-[#d0d8e0]
+                  file:mr-2 file:py-0.5 file:px-2 file:rounded file:text-xs file:font-semibold
+                  file:cursor-pointer file:disabled:opacity-50 file:disabled:cursor-default
+                  file:bg-[linear-gradient(180deg,#6fcf97,#27ae60_50%,#1e8449)]
+                  file:border file:border-[#1a7a3a] file:text-white file:[text-shadow:0_1px_0_rgba(0,0,0,0.3)]
+                  file:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_3px_rgba(0,0,0,0.3)]
+                  hover:file:bg-[linear-gradient(180deg,#7fdfa7,#37be70_50%,#2e9459)]
+                  active:file:bg-[linear-gradient(180deg,#1e8449,#166838_50%,#0e5028)]
+                  dark:file:bg-[linear-gradient(180deg,#4ec2f7,#2d9ee0_50%,#1c80c4)]
+                  dark:file:border-[#1565a8]
+                  dark:hover:file:bg-[linear-gradient(180deg,#5ad2ff,#3aa8e8_50%,#2890cc)]
+                  dark:active:file:bg-[linear-gradient(180deg,#1c80c4,#1565a8_50%,#0d4a82)]"
+              />
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="inline-flex items-center gap-1 min-h-[24px] px-3 py-0.5 rounded text-xs font-semibold cursor-pointer
+                  disabled:opacity-50 disabled:cursor-default
+                  bg-[linear-gradient(180deg,#6fcf97,#27ae60_50%,#1e8449)]
+                  border border-[#1a7a3a] text-white [text-shadow:0_1px_0_rgba(0,0,0,0.3)]
+                  shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_3px_rgba(0,0,0,0.3)]
+                  hover:bg-[linear-gradient(180deg,#7fdfa7,#37be70_50%,#2e9459)] hover:border-[#1a6a30]
+                  active:bg-[linear-gradient(180deg,#1e8449,#166838_50%,#0e5028)]
+                  dark:bg-[linear-gradient(180deg,#4ec2f7,#2d9ee0_50%,#1c80c4)]
+                  dark:border-[#1565a8]
+                  dark:hover:bg-[linear-gradient(180deg,#5ad2ff,#3aa8e8_50%,#2890cc)]
+                  dark:active:bg-[linear-gradient(180deg,#1c80c4,#1565a8_50%,#0d4a82)]"
+              >
+                {uploading ? (
+                  <span className="inline-flex items-center gap-1">
+                    <LoadingDots /> Indexing
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <UploadIcon /> Upload
+                  </span>
+                )}
+              </button>
+            </div>
+            {uploadStatus && (
+              <p className="mt-1.5 text-[11px] text-[#555] dark:text-[#b0d0e0] leading-tight">
+                {uploadStatus}
+              </p>
+            )}
           </div>
         </div>
 

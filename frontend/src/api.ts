@@ -15,4 +15,12 @@ export async function askQuestion(question: string) {
   return res.json() as Promise<{ answer: string; context: { source: string; score: number; excerpt: string }[] }>;
 }
 
+export async function uploadPdf(file: File): Promise<{ filename: string; chunks: number; pages: number; error?: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE}/upload`, { method: "POST", body: form });
+  if (!res.ok) throw new Error((await res.json()).detail);
+  return res.json();
+}
+
 

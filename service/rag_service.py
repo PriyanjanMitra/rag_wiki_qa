@@ -2,6 +2,8 @@ import logging
 from pathlib import Path
 
 import httpx
+import pymupdf
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from config import config
 from repository import VectorRepository
@@ -27,6 +29,44 @@ class RAGService:
         self.ollama_url = (ollama_url or config.ollama_url).rstrip("/")
         self.ollama_model = ollama_model or config.ollama_model
         self.top_k = top_k if top_k is not None else config.top_k
+
+    def upload_pdf(self, pdf_path: Path) -> dict:
+        doc = pymupdf.open(str(pdf_path))
+        pages_text = []
+        for page in doc:
+            text = page.get_text().strip()
+            if text:
+                pages_text.append(text)
+        doc.close()
+
+        if not pages_text:
+            return {"filename": pdf_path.name, "chunks": 0, "pages": 0, "error": "No extractable text"}
+
+        full_text = "\n\n".join(pages_text)
+
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+            separators=["\n\n", "\n", ". ", " ", ""],
+            length_function=len,
+        )
+        chunks = splitter.split_text(full_text)
+
+        metadatas = [
+            {
+                "source": pdf_path.name,
+                "pages": len(pages_text),
+                "size_mb": round(pdf_path.stat().st_size / (1024 * 1024), 2),
+                "chunk_id": idx,
+                "uploaded": True,
+            }
+            for idx in range(len(chunks))
+        ]
+
+        self.repository.add_vectors(chunks, metadatas)
+
+        logger.info("Uploaded PDF '%s': %s chunks, %s pages", pdf_path.name, len(chunks), len(pages_text))
+        return {"filename": pdf_path.name, "chunks": len(chunks), "pages": len(pages_text)}
 
     def ask(self, question: str) -> dict:
         results = self.repository.search(question, k=self.top_k)
