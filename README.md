@@ -25,55 +25,66 @@ A local Retrieval-Augmented Generation (RAG) system that answers questions from 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (Vite + React)                   │
-│                    Port 5173 (dev)                           │
-│                                                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐  │
-│  │  Ask     │  │ Answer   │  │ Sources  │  │ Dark Mode  │  │
-│  │  Input   │  │ Display  │  │Accordion │  │ Toggle     │  │
-│  └────┬─────┘  └──────────┘  └──────────┘  └────────────┘  │
-│       │                                                     │
-└───────┼─────────────────────────────────────────────────────┘
-        │ POST /ask, /health
-        │ (Vite proxy → localhost:8000)
-        ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   Backend (FastAPI + Uvicorn)                │
-│                   Port 8000                                  │
-│                                                             │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  route/api.py                                         │  │
-│  │  ┌──────────┐  ┌──────────┐                           │  │
-│  │  │ /health  │  │ /ask     │                           │  │
-│  │  │   GET    │  │   POST   │                           │  │
-│  │  └────┬─────┘  └────┬─────┘                           │  │
-│  └───────┼─────────────┼──────────────────────────────────┘  │
-│          ▼             ▼                                      │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  service/rag_service.py                               │  │
-│  │  RAGService: orchestrates retrieval + generation      │  │
-│  └──────────┬────────────────────────────────────────────┘  │
-│             │                                               │
-│      ┌──────┴──────┐                                        │
-│      ▼             ▼                                         │
-│  ┌──────────┐  ┌──────────┐                                 │
-│  │ Vector   │  │ Ollama   │                                 │
-│  │Repository│  │ (LLM)    │                                 │
-│  │(FAISS)   │  │ Port     │                                 │
-│  │          │  │ 11434    │                                 │
-│  └──────────┘  └──────────┘                                 │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    Frontend (Vite + React)                    │
+│                    Port 5173 (dev)                            │
+│                                                              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐   │
+│  │  Ask     │  │ Answer   │  │ Sources  │  │ Dark Mode  │   │
+│  │  Input   │  │ Display  │  │Accordion │  │ Toggle     │   │
+│  └────┬─────┘  └──────────┘  └──────────┘  └────────────┘   │
+│       │                                                      │
+│  ┌────┴───────────┐                                          │
+│  │  Upload card   │                                          │
+│  │  (file+button) │                                          │
+│  └────┬───────────┘                                          │
+└───────┼──────────────────────────┬───────────────────────────┘
+        │ POST /ask, /health       │ POST /upload (multipart)
+        │ (Vite proxy              │ (Vite proxy
+        │  → localhost:8000)       │  → localhost:8000)
+        ▼                          ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   Backend (FastAPI + Uvicorn)                 │
+│                   Port 8000                                   │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  route/api.py                                          │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐             │  │
+│  │  │ /health  │  │ /ask     │  │ /upload  │             │  │
+│  │  │   GET    │  │   POST   │  │   POST   │             │  │
+│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘             │  │
+│  └───────┼─────────────┼─────────────┼────────────────────┘  │
+│          ▼             ▼             ▼                        │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  service/rag_service.py                                │  │
+│  │  ask() → retrieve + generate                           │  │
+│  │  upload_pdf() → extract + chunk + embed + add_vectors()│  │
+│  └──────────┬─────────────────────────────────────────────┘  │
+│             │                                                │
+│      ┌──────┴──────┐                                         │
+│      ▼             ▼                                          │
+│  ┌──────────┐  ┌──────────┐                                  │
+│  │ Vector   │  │ Ollama   │                                  │
+│  │Repository│  │ (LLM)    │                                  │
+│  │(FAISS)   │  │ Port     │                                  │
+│  │          │  │ 11434    │                                  │
+│  └──────────┘  └──────────┘                                  │
+└──────────────────────────────────────────────────────────────┘
 
 Pipeline (one-time build):
   GateBooks/*.pdf  →  PDF Loader  →  Chunker  →  Embedder  →  FAISS Index
                       (PyMuPDF)      (text split) (all-MiniLM)  (index/)
+
+Incremental upload (runtime):
+  Uploaded PDF  →  extract (PyMuPDF)  →  chunk (text split)
+                  →  embed (all-MiniLM)  →  add_vectors()  →  persist (disk)
 ```
 
 ## Features
 
 - **RAG Q&A** — Ask questions about your PDF textbooks; retrieves relevant chunks via FAISS similarity search and generates answers using Ollama LLMs.
 - **Source attribution** — Every answer shows which textbook and passage the information came from, with similarity scores.
+- **PDF upload** — Upload a new PDF from the frontend; it is automatically extracted, chunked, embedded, and added to the FAISS index incrementally without rebuilding. The index persists to disk immediately.
 - **Windows 7 Aero UI** — Glassmorphism design with animated background blobs, gradient title bars, themed to orange/warm in light mode and blue/cool in dark mode.
 - **Dark / light mode** — Persisted preference with system default detection.
 - **Cross-platform launcher** — `python run.py` starts both backend and frontend with clean shutdown on Ctrl+C.
@@ -161,7 +172,7 @@ rag_wiki_qa/
 │
 ├── route/
 │   ├── __init__.py
-│   └── api.py                # FastAPI routes (health, ask, search)
+│   └── api.py                # FastAPI routes (health, ask, upload, search)
 │
 ├── service/
 │   ├── __init__.py
@@ -190,11 +201,14 @@ rag_wiki_qa/
     ├── package.json
     ├── tsconfig.json
     ├── vite.config.ts
+    ├── env.d.ts               # @tailwindcss/vite module declaration
+    ├── public/
+    │   └── favicon.svg        # Windows 7 Aero glass SVG (theme-aware)
     └── src/
         ├── main.tsx           # React entry point
         ├── App.tsx            # Main UI component
-        ├── App.css            # Tailwind import + theme
-        ├── api.ts             # API client (fetch)
+        ├── App.css            # Tailwind import + @custom-variant dark
+        ├── api.ts             # API client (fetch + FormData upload)
         └── vite-env.d.ts      # TypeScript declarations
 ```
 
@@ -228,24 +242,55 @@ rag_wiki_qa/
 
 ### POST /upload
 
-Upload a PDF as `multipart/form-data` with field name `file`:
+Upload a PDF as `multipart/form-data` with field name `file`. The backend
+extracts text via PyMuPDF, chunks with `RecursiveCharacterTextSplitter`,
+embeds with `all-MiniLM-L6-v2`, and appends to the FAISS index incrementally
+(no full rebuild). See [Incremental Upload Pipeline](#incremental-upload-pipeline)
+for implementation details.
 
 ```bash
 curl -F "file=@mybook.pdf" http://localhost:8000/upload
 ```
 
-Response:
+Successful response:
 ```json
 { "filename": "mybook.pdf", "chunks": 42, "pages": 15 }
 ```
 
-The uploaded PDF is extracted, chunked, embedded, and appended directly to the
-in-memory FAISS index. The updated index is persisted to disk immediately so it
-survives a server restart.
+Error response (no extractable text):
+```json
+{ "filename": "blank.pdf", "chunks": 0, "pages": 0, "error": "No extractable text" }
+```
+
+The endpoint validates the `.pdf` extension (returns HTTP 400 otherwise). The
+temporary uploaded file is always cleaned up in a `finally` block. The updated
+index is persisted to disk immediately so it survives a server restart.
+
+## Incremental Upload Pipeline
+
+When a PDF is uploaded through the frontend, `upload_pdf()` processes it at
+runtime without rebuilding the full index:
+
+1. **Receive** — The `POST /upload` handler saves the file to a temp location
+   and runs `svc.upload_pdf()` on a thread pool executor.
+2. **Extract** — PyMuPDF extracts text page by page; pages are joined with
+   double newlines.
+3. **Chunk** — `RecursiveCharacterTextSplitter` splits the combined text
+   (same chunk size/overlap as the initial build).
+4. **Embed** — Batched encoding (default batch size: 16) with
+   `all-MiniLM-L6-v2`.
+5. **Add & Persist** — `repository.add_vectors()` appends to the in-memory
+   FAISS index under a `threading.Lock`, then writes `index.faiss`,
+   `chunks.pkl`, and `metadata.pkl` to disk.
+6. **Cleanup** — The temp file is deleted in a `finally` block.
+
+Uploaded chunk metadata includes `"uploaded": True` plus filename, page count,
+file size, and chunk index.
 
 ## Pipeline: Building the Index
 
-The pipeline processes PDFs from `GateBooks/` through four stages:
+The one-time build pipeline processes PDFs from `GateBooks/` through four
+stages:
 
 1. **PDF Loading** (`pdf_loader.py`) — Extracts text from each PDF using PyMuPDF, per-page.
 2. **Chunking** (`chunker_embedder.py`) — Splits each document's text into overlapping chunks (configurable size / overlap).
@@ -267,6 +312,9 @@ python -m pipeline.build_index
 | Frontend shows blank page | Backend not running | Start backend on port 8000 |
 | Vite proxy errors | Backend not running on port 8000 | `python main.py` or `python run.py` |
 | `pip install` fails | Conflicting pinned versions | Try `pip install -r requirements.txt --no-deps` or create fresh venv |
+| Upload returns 500 | PDF contains only images (no text layer) | Use OCR'd PDF or check with `pdftotext` |
+| Upload hangs | Large PDF causing slow embedding | Wait for processing; check backend logs for progress |
+| Uploaded content not found in answers | Thread race between search and `add_vectors` | The `threading.Lock` prevents this; verify index size increased |
 
 ## License
 
