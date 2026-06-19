@@ -28,12 +28,15 @@ def chunk_documents(texts, metadatas, chunk_size, chunk_overlap):
     return all_chunks, all_meta
 
 
-def create_embeddings_batched(chunks, embed_model, batch_size):
+def create_embeddings_batched(chunks, embed_model, batch_size, hf_token=None):
     print(f"\nLoading model: {embed_model}")
 
     import torch
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = SentenceTransformer(embed_model, device=device)
+    kwargs = {"device": device}
+    if hf_token:
+        kwargs["token"] = hf_token
+    model = SentenceTransformer(embed_model, **kwargs)
     dim = model.get_embedding_dimension()
     print(f"Dimension: {dim}, Device: {device}")
 

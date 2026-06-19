@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from pathlib import Path
@@ -11,13 +12,20 @@ from pipeline.pdf_loader import load_pdfs
 
 
 if __name__ == "__main__":
+    hf_token = os.environ.get("HF_TOKEN") or config.hf_token
+    if not hf_token:
+        hf_token = input("Enter HuggingFace token (HF_TOKEN): ").strip()
+        if not hf_token:
+            print("No token provided. Proceeding without authentication.")
+            hf_token = None
+
     start = time.time()
 
     texts, metadatas = load_pdfs(config.pdf_dir)
 
     chunks, chunk_metadatas = chunk_documents(texts, metadatas, config.chunk_size, config.chunk_overlap)
 
-    embeddings, dim = create_embeddings_batched(chunks, config.embed_model, config.batch_size)
+    embeddings, dim = create_embeddings_batched(chunks, config.embed_model, config.batch_size, hf_token=hf_token)
 
     index_config = {
         "embed_model": config.embed_model,
