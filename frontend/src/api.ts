@@ -23,4 +23,15 @@ export async function uploadPdf(file: File): Promise<{ filename: string; chunks:
   return res.json();
 }
 
+export async function getUploads(): Promise<{ filename: string; pages: number; chunks: number }[]> {
+  const res = await fetch(`${BASE}/uploads`);
+  return res.json();
+}
+
+export async function deleteUpload(filename: string): Promise<{ filename: string; removed: number }> {
+  const res = await fetch(`${BASE}/upload/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error((await res.json()).detail);
+  return res.json();
+}
+
 

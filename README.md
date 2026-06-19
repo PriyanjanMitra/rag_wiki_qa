@@ -219,6 +219,8 @@ rag_wiki_qa/
 | `/health` | GET | Returns index status (size, dimension) |
 | `/ask` | POST | Ask a question, get answer + sources |
 | `/upload` | POST | Upload a PDF (multipart), chunk, embed, and add to index |
+| `/upload/{filename}` | DELETE | Remove an uploaded PDF and its chunks from the index |
+| `/uploads` | GET | List all currently indexed uploads |
 | `/search` | POST | Search the index directly (raw results) |
 
 ### POST /ask
@@ -265,6 +267,39 @@ Error response (no extractable text):
 The endpoint validates the `.pdf` extension (returns HTTP 400 otherwise). The
 temporary uploaded file is always cleaned up in a `finally` block. The updated
 index is persisted to disk immediately so it survives a server restart.
+
+### DELETE /upload/{filename}
+
+Removes an uploaded PDF and all its chunks from the index. Deleted chunks are
+filtered out of search results immediately. The deletion is persisted in
+`index/deleted_uploads.json` and survives restarts.
+
+```bash
+curl -X DELETE "http://localhost:8000/upload/mybook.pdf"
+```
+
+Response:
+```json
+{ "filename": "mybook.pdf", "removed": 42 }
+```
+
+Returns 404 if the filename was never uploaded.
+
+### GET /uploads
+
+Lists all currently indexed uploaded PDFs with chunk and page counts.
+
+```bash
+curl http://localhost:8000/uploads
+```
+
+Response:
+```json
+[
+  { "filename": "mybook.pdf", "pages": 15, "chunks": 42 },
+  { "filename": "notes.pdf", "pages": 8, "chunks": 23 }
+]
+```
 
 ## Incremental Upload Pipeline
 

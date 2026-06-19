@@ -2,6 +2,7 @@ import asyncio
 import logging
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import unquote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
@@ -55,7 +56,8 @@ async def root():
         "endpoints": {
             "/health": "GET",
             "/ask": "POST",
-            "/upload": "POST (multipart)",
+            "/upload": "POST (multipart), DELETE /upload/{filename}",
+            "/uploads": "GET",
             "/search": "POST",
         },
     }
@@ -74,6 +76,7 @@ async def health():
     return {
         "status": "ok",
         "index_size": svc.repository.size,
+        "active_size": svc.repository.active_size,
         "dimension": svc.repository.dimension,
     }
 
@@ -115,3 +118,18 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e)[:200])
     finally:
         tmp.unlink(missing_ok=True)
+
+
+@app.get("/uploads")
+async def list_uploads():
+    return get_service().list_uploads()
+
+
+@app.delete("/upload/{filename:path}")
+async def delete_upload(filename: str):
+    decoded = unquote(filename)
+    svc = get_service()
+    result = svc.delete_upload(decoded)
+    if result.get("error"):
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result

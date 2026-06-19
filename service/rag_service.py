@@ -10,28 +10,10 @@ from repository import VectorRepository
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """SYSTEM INSTRUCTION: ZERO EXTERNAL KNOWLEDGE ALLOWED.
-
-You are FORBIDDEN from:
-- Using any information from your pre-training
-- Applying world knowledge
-- Making logical leaps beyond what's written
-- Defining terms not defined in context
-- Giving examples not in context
-- Providing background information
-
-ALLOWED ACTIONS:
-- Directly quote the context
-- Paraphrase the context
-- Synthesize information that is EXPLICITLY stated across multiple passages
-- Use maximum tokens to give in depth answers
-
-If the context does not have the answer, you MUST output:
-"I cannot answer this question based on the provided context."
-
-Do not output anything else in that case.
-"""
-
+SYSTEM_PROMPT ="""You are a helpful assistant. Answer the question based ONLY on the provided context.
+                    Provide a thorough, detailed answer and explain concepts clearly. 
+                    If the context doesn't contain enough information, say so clearly.
+                     DO NOT USE External Knowledge or general information of topics not in the knowledge base. Use maximum tokens for ideal indepth answer"""
 
 class RAGService:
     def __init__(
@@ -84,6 +66,7 @@ class RAGService:
         ]
 
         self.repository.add_vectors(chunks, metadatas)
+        self.repository.undelete_upload(pdf_path.name)
 
         logger.info("Uploaded PDF '%s': %s chunks, %s pages", pdf_path.name, len(chunks), len(pages_text))
         return {"filename": pdf_path.name, "chunks": len(chunks), "pages": len(pages_text)}
@@ -159,6 +142,12 @@ Answer:"""
                 for r in results
             ],
         }
+
+    def delete_upload(self, filename: str) -> dict:
+        return self.repository.delete_upload(filename)
+
+    def list_uploads(self) -> list[dict]:
+        return self.repository.list_uploads()
 
     def search(self, query: str, k: int | None = None) -> list:
         return self.repository.search(query, k=k if k is not None else self.top_k)

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { askQuestion, uploadPdf } from "./api";
+import { askQuestion, uploadPdf, getUploads, deleteUpload } from "./api";
 import "./App.css";
 
 function getInitialDark(): boolean {
@@ -58,12 +58,21 @@ export default function App() {
   const [dark, setDark] = useState(getInitialDark);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [uploads, setUploads] = useState<{ filename: string; pages: number; chunks: number }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const fetchUploads = useCallback(async () => {
+    try {
+      setUploads(await getUploads());
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     localStorage.setItem("dark-mode", String(dark));
   }, [dark]);
+
+  useEffect(() => { fetchUploads(); }, [fetchUploads]);
 
   const handleAsk = useCallback(async () => {
     if (!question.trim()) return;
@@ -93,13 +102,14 @@ export default function App() {
         setUploadStatus(`Error: ${result.error}`);
       } else {
         setUploadStatus(`Indexed "${result.filename}" — ${result.chunks} chunk(s), ${result.pages} page(s)`);
+        await fetchUploads();
       }
     } catch (e) {
       setUploadStatus(`Upload failed: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
-  }, []);
+  }, [fetchUploads]);
 
   return (
     <div className="font-segoe">
@@ -267,6 +277,37 @@ export default function App() {
               <p className="mt-1.5 text-[11px] text-[#555] dark:text-[#b0d0e0] leading-tight">
                 {uploadStatus}
               </p>
+            )}
+            {uploads.length > 0 && (
+              <div className="mt-2 border-t border-black/10 dark:border-white/10 pt-2">
+                <p className="text-[11px] text-[#888] dark:text-[#a0c8e8] mb-1 font-semibold">
+                  Indexed PDFs
+                </p>
+                {uploads.map((u) => (
+                  <div key={u.filename} className="flex items-center gap-1.5 py-0.5">
+                    <span className="flex-1 text-[11px] text-[#444] dark:text-[#c0d0e0] truncate">
+                      {u.filename}
+                    </span>
+                    <span className="text-[10px] text-[#888] dark:text-[#8899aa] flex-shrink-0">
+                      {u.chunks} chunk(s)
+                    </span>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await deleteUpload(u.filename);
+                          await fetchUploads();
+                        } catch { /* ignore */ }
+                      }}
+                      className="text-[10px] px-1.5 py-0.5 rounded cursor-pointer
+                        text-red-600 hover:text-red-800 hover:bg-red-100
+                        dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30"
+                      title={`Remove ${u.filename} from index`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

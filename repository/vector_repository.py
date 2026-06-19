@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import json
 import logging
 import pickle
 import threading
@@ -32,6 +33,13 @@ class VectorRepository:
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._lock = threading.Lock()
 
+        deleted_path = self.index_dir / "deleted_uploads.json"
+        if deleted_path.exists():
+            with open(deleted_path) as f:
+                self._deleted_uploads: set[str] = set(json.load(f))
+        else:
+            self._deleted_uploads: set[str] = set()
+
         logger.info("Repository loaded: %s chunks, dim=%s", self.index.ntotal, self.index.d)
 
     @property
@@ -41,6 +49,18 @@ class VectorRepository:
     @property
     def size(self) -> int:
         return self.index.ntotal
+
+    @property
+    def active_size(self) -> int:
+        with self._lock:
+            return sum(
+                1 for m in self.metadata
+                if not (m.get("uploaded") and m.get("source", "") in self._deleted_uploads)
+            )
+
+    def _save_deleted(self):
+        with open(self.index_dir / "deleted_uploads.json", "w") as f:
+            json.dump(list(self._deleted_uploads), f)
 
     def embed_query(self, text: str) -> np.ndarray:
         return self.embedder.encode([text], normalize_embeddings=True)
@@ -75,6 +95,47 @@ class VectorRepository:
         with open(self.index_dir / "metadata.pkl", "wb") as f:
             pickle.dump(self.metadata, f)
 
+    def delete_upload(self, filename: str) -> dict:
+        with self._lock:
+            count = sum(
+                1 for m in self.metadata
+                if m.get("uploaded") and m.get("source") == filename
+            )
+            if count == 0:
+                return {"filename": filename, "removed": 0, "error": "File not found in index"}
+
+            self._deleted_uploads.add(filename)
+            self._save_deleted()
+            logger.info("Deleted upload '%s': %s chunks removed", filename, count)
+            return {"filename": filename, "removed": count}
+
+    def undelete_upload(self, filename: str):
+        with self._lock:
+            if filename in self._deleted_uploads:
+                self._deleted_uploads.discard(filename)
+                self._save_deleted()
+                logger.info("Undeleted upload '%s'", filename)
+
+    def list_uploads(self) -> list[dict]:
+        seen: set[str] = set()
+        uploads = []
+        for m in self.metadata:
+            if not m.get("uploaded"):
+                continue
+            src = m.get("source", "unknown")
+            if src in seen or src in self._deleted_uploads:
+                continue
+            seen.add(src)
+            uploads.append({
+                "filename": src,
+                "pages": m.get("pages", 0),
+                "chunks": sum(
+                    1 for m2 in self.metadata
+                    if m2.get("source") == src and m2.get("uploaded")
+                ),
+            })
+        return uploads
+
     def search(self, query: str, k: int = 3):
         q_emb = self.embed_query(query)
         scores, indices = self.index.search(q_emb.astype(np.float32), k)
@@ -83,10 +144,13 @@ class VectorRepository:
         for score, idx in zip(scores[0], indices[0]):
             if idx < 0:
                 continue
+            meta = self.metadata[idx]
+            if meta.get("uploaded") and meta.get("source", "") in self._deleted_uploads:
+                continue
             results.append({
                 "score": float(score),
                 "chunk": self.chunks[idx],
-                "metadata": self.metadata[idx],
+                "metadata": meta,
                 "index": int(idx),
             })
 

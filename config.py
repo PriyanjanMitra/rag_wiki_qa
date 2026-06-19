@@ -13,9 +13,9 @@ class Config:
     top_k: int = 5
 
     pdf_dir: Path = Path("GateBooks")
-    chunk_size: int = 256
-    chunk_overlap: int = 32
-    batch_size: int = 16
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+    batch_size: int =8
 
 
 config = Config()
