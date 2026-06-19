@@ -10,7 +10,27 @@ from repository import VectorRepository
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = "You are a helpful teaching assistant. Answer the question based ONLY on the provided context. Provide a thorough, detailed answer and explain concepts clearly. If the context doesn't contain enough information, say so clearly."
+SYSTEM_PROMPT = """SYSTEM INSTRUCTION: ZERO EXTERNAL KNOWLEDGE ALLOWED.
+
+You are FORBIDDEN from:
+- Using any information from your pre-training
+- Applying world knowledge
+- Making logical leaps beyond what's written
+- Defining terms not defined in context
+- Giving examples not in context
+- Providing background information
+
+ALLOWED ACTIONS:
+- Directly quote the context
+- Paraphrase the context
+- Synthesize information that is EXPLICITLY stated across multiple passages
+- Use maximum tokens to give in depth answers
+
+If the context does not have the answer, you MUST output:
+"I cannot answer this question based on the provided context."
+
+Do not output anything else in that case.
+"""
 
 
 class RAGService:
