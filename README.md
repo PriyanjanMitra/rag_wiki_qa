@@ -3,7 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/github/stars/PriyanjanMitra/rag_wiki_qa?style=for-the-badge&logo=github&color=ffd700" alt="stars" />
   <img src="https://img.shields.io/github/forks/PriyanjanMitra/rag_wiki_qa?style=for-the-badge&logo=github&color=58a6ff" alt="forks" />
-  <img src="https://img.shields.io/badge/license-GPL%20v3-blue?style=for-the-badge&color=7c3aed" alt="license" />
+  <img src="https://img.shields.io/github/license/PriyanjanMitra/rag_wiki_qa?style=for-the-badge&color=7c3aed" alt="license" />
   <img src="https://img.shields.io/badge/python-3.10+-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="python" />
   <img src="https://img.shields.io/badge/node-18+-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="node" />
   <img src="https://img.shields.io/badge/react-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="react" />
