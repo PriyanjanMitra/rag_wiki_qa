@@ -10,6 +10,7 @@ export default defineConfig({
       "/ask": "http://localhost:8000",
       "/health": "http://localhost:8000",
       "/upload": "http://localhost:8000",
+      "/uploads": "http://localhost:8000",
     },
   },
 });

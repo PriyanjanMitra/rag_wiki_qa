@@ -74,6 +74,13 @@ class RAGService:
     def ask(self, question: str) -> dict:
         results = self.repository.search(question, k=self.top_k)
 
+        up_results = self.repository.search_uploads(question, k=self.top_k * 2)
+        seen = {r["index"] for r in results}
+        for r in up_results:
+            if r["index"] not in seen:
+                results.append(r)
+                seen.add(r["index"])
+
         context = "\n\n".join(r["chunk"] for r in results)
 
         prompt = f"""{SYSTEM_PROMPT}
@@ -87,7 +94,7 @@ Answer:"""
         response = httpx.post(
             f"{self.ollama_url}/api/generate",
             json={"model": self.ollama_model, "prompt": prompt, "stream": False},
-            timeout=120.0,
+            timeout=300.0,
         )
         response.raise_for_status()
         answer = response.json()["response"]
@@ -107,6 +114,14 @@ Answer:"""
     async def ask_async(self, question: str) -> dict:
         results = await self.repository.search_async(question, k=self.top_k)
 
+        up_results = await self.repository.search_uploads_async(question, k=self.top_k * 2)
+        logger.info("ask_async: normal=%d uploads_found=%d", len(results), len(up_results))
+        seen = {r["index"] for r in results}
+        for r in up_results:
+            if r["index"] not in seen:
+                results.append(r)
+                seen.add(r["index"])
+
         if not results:
             return {
                 "answer": "I couldn't find any relevant information to answer that question.",
@@ -123,7 +138,7 @@ Context:
 Question: {question}
 Answer:"""
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
                 f"{self.ollama_url}/api/generate",
                 json={"model": self.ollama_model, "prompt": prompt, "stream": False},

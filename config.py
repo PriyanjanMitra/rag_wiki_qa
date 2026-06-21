@@ -15,7 +15,7 @@ class Config:
     pdf_dir: Path = Path("GateBooks")
     chunk_size: int = 512
     chunk_overlap: int = 64
-    batch_size: int = 8
+    batch_size: int = 16
 
     hf_token: str | None = None
 

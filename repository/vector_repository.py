@@ -136,6 +136,25 @@ class VectorRepository:
             })
         return uploads
 
+    def search_uploads(self, query: str, k: int = 3) -> list[dict]:
+        q_emb = self.embed_query(query)
+        candidates = []
+        for idx, meta in enumerate(self.metadata):
+            if not meta.get("uploaded"):
+                continue
+            if meta.get("source", "") in self._deleted_uploads:
+                continue
+            vec = self.index.reconstruct(idx)
+            score = float(q_emb[0] @ vec)
+            candidates.append({
+                "score": score,
+                "chunk": self.chunks[idx],
+                "metadata": meta,
+                "index": idx,
+            })
+        candidates.sort(key=lambda x: x["score"], reverse=True)
+        return candidates[:k]
+
     def search(self, query: str, k: int = 3):
         q_emb = self.embed_query(query)
         scores, indices = self.index.search(q_emb.astype(np.float32), k)
@@ -155,6 +174,10 @@ class VectorRepository:
             })
 
         return results
+
+    async def search_uploads_async(self, query: str, k: int = 3):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self.search_uploads, query, k)
 
     async def search_async(self, query: str, k: int = 3):
         loop = asyncio.get_running_loop()
