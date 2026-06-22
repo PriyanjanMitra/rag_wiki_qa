@@ -32,22 +32,6 @@ class AskResponse(BaseModel):
     context: list
 
 
-class SearchRequest(BaseModel):
-    query: str
-    k: int = 3
-
-
-class SearchResult(BaseModel):
-    score: float
-    chunk: str
-    metadata: dict
-    index: int
-
-
-class SearchResponse(BaseModel):
-    results: list[SearchResult]
-
-
 @app.get("/")
 async def root():
     return {
@@ -58,7 +42,6 @@ async def root():
             "/ask": "POST",
             "/upload": "POST (multipart), DELETE /upload/{filename}",
             "/uploads": "GET",
-            "/search": "POST",
         },
     }
 
@@ -91,14 +74,6 @@ async def ask(body: AskRequest):
     except Exception as e:
         logger.exception("Error processing /ask")
         raise HTTPException(status_code=500, detail=str(e)[:200])
-
-
-@app.post("/search", response_model=SearchResponse)
-async def search(body: SearchRequest):
-    if not body.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
-    results = await get_service().search_async(body.query, k=body.k)
-    return SearchResponse(results=[SearchResult(**r) for r in results])
 
 
 @app.post("/upload")

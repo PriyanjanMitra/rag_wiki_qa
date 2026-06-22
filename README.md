@@ -221,7 +221,6 @@ rag_wiki_qa/
 | `/upload` | POST | Upload a PDF (multipart), chunk, embed, and add to index |
 | `/upload/{filename}` | DELETE | Remove an uploaded PDF and its chunks from the index |
 | `/uploads` | GET | List all currently indexed uploads |
-| `/search` | POST | Search the index directly (raw results) |
 
 ### POST /ask
 

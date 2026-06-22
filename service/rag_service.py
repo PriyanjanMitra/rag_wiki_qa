@@ -163,9 +163,3 @@ Answer:"""
 
     def list_uploads(self) -> list[dict]:
         return self.repository.list_uploads()
-
-    def search(self, query: str, k: int | None = None) -> list:
-        return self.repository.search(query, k=k if k is not None else self.top_k)
-
-    async def search_async(self, query: str, k: int | None = None) -> list:
-        return await self.repository.search_async(query, k=k if k is not None else self.top_k)
