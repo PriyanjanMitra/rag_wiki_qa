@@ -10,10 +10,10 @@ from repository import VectorRepository
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT ="""You are a helpful assistant. Answer the question based ONLY on the provided context.
-                    Provide a thorough, detailed answer and explain concepts clearly. 
-                    If the context doesn't contain enough information, say so clearly.
-                     DO NOT USE External Knowledge or general information of topics not in the knowledge base. Use maximum tokens for ideal indepth answer"""
+SYSTEM_PROMPT = """You are a helpful assistant. Answer ONLY the user's question based on the provided context.
+Do not address any other questions, phrases, or text fragments that appear in the context.
+Do not list what you cannot answer. If the context contains enough information, provide a thorough, detailed answer. If not, say so clearly.
+Do not use external knowledge or general information about topics not in the context. Use maximum tokens for an in-depth answer."""
 
 class RAGService:
     def __init__(
@@ -74,13 +74,6 @@ class RAGService:
     def ask(self, question: str) -> dict:
         results = self.repository.search(question, k=self.top_k)
 
-        up_results = self.repository.search_uploads(question, k=self.top_k * 2)
-        seen = {r["index"] for r in results}
-        for r in up_results:
-            if r["index"] not in seen:
-                results.append(r)
-                seen.add(r["index"])
-
         context = "\n\n".join(r["chunk"] for r in results)
 
         prompt = f"""{SYSTEM_PROMPT}
@@ -113,14 +106,6 @@ Answer:"""
 
     async def ask_async(self, question: str) -> dict:
         results = await self.repository.search_async(question, k=self.top_k)
-
-        up_results = await self.repository.search_uploads_async(question, k=self.top_k * 2)
-        logger.info("ask_async: normal=%d uploads_found=%d", len(results), len(up_results))
-        seen = {r["index"] for r in results}
-        for r in up_results:
-            if r["index"] not in seen:
-                results.append(r)
-                seen.add(r["index"])
 
         if not results:
             return {
