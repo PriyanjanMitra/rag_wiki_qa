@@ -28,7 +28,7 @@ backend = subprocess.Popen(
 procs.append(backend)
 
 frontend = subprocess.Popen(
-    ["npm", "run", "dev"],
+    ["npm", "run", "preview"],
     cwd=os.path.join(BASE, "frontend"),
     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
 )

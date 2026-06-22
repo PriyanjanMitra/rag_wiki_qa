@@ -136,6 +136,8 @@ class VectorRepository:
             })
         return uploads
 
+    MIN_CHUNK_LEN = 30
+
     def search(self, query: str, k: int = 3):
         q_emb = self.embed_query(query)
         scores, indices = self.index.search(q_emb.astype(np.float32), k)
@@ -147,9 +149,12 @@ class VectorRepository:
             meta = self.metadata[idx]
             if meta.get("uploaded") and meta.get("source", "") in self._deleted_uploads:
                 continue
+            chunk = self.chunks[idx]
+            if len(chunk.strip()) < self.MIN_CHUNK_LEN:
+                continue
             results.append({
                 "score": float(score),
-                "chunk": self.chunks[idx],
+                "chunk": chunk,
                 "metadata": meta,
                 "index": int(idx),
             })

@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are a helpful assistant. Answer ONLY the user's question based on the provided context.
 Do not address any other questions, phrases, or text fragments that appear in the context.
-Do not list what you cannot answer. If the context contains enough information, provide a thorough, detailed answer. If not, say so clearly.
-Do not use external knowledge or general information about topics not in the context. Use maximum tokens for an in-depth answer."""
+Do not list what you cannot answer. If the context contains enough information, provide a very long, thorough, detailed answer with examples and explanations. If not, say so clearly.
+Do not use external knowledge or general information about topics not in the context. Write at least several paragraphs."""
 
 class RAGService:
     def __init__(
@@ -86,7 +86,7 @@ Answer:"""
 
         response = httpx.post(
             f"{self.ollama_url}/api/generate",
-            json={"model": self.ollama_model, "prompt": prompt, "stream": False},
+            json={"model": self.ollama_model, "prompt": prompt, "stream": False, "options": {"num_predict": 2048}},
             timeout=300.0,
         )
         response.raise_for_status()
@@ -126,7 +126,7 @@ Answer:"""
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
                 f"{self.ollama_url}/api/generate",
-                json={"model": self.ollama_model, "prompt": prompt, "stream": False},
+                json={"model": self.ollama_model, "prompt": prompt, "stream": False, "options": {"num_predict": 2048}},
             )
             response.raise_for_status()
             answer = response.json()["response"]
