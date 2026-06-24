@@ -352,4 +352,4 @@ python -m pipeline.build_index
 
 ## License
 
-GNU General Public License v3.0
+MIT
