@@ -11,7 +11,7 @@ from repository import VectorRepository
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You have no knowledge of your own. Every fact you know comes from the context below. You cannot recognize or identify any person, song, place, or thing that is not explicitly named in the context.
-Your answer must be ENTIRELY based on the context. Quote or paraphrase only what the context says.
+Your answer must be ENTIRELY based on the context. Synthesize the information — do not repeat the context verbatim or quote large blocks of text.
 If the context does not contain enough information to answer the question, respond ONLY with: I don't know.
 Do not add any introduction, explanation, or commentary about what you can or cannot find. Just answer the question or say I don't know.
 Correct obvious typos in the source text. Provide a very long, thorough, detailed answer if the context supports it."""

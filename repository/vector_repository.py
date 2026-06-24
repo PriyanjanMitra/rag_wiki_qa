@@ -226,7 +226,13 @@ class VectorRepository:
             fallback = self._keyword_fallback(expanded, key_terms, k)
             return fallback
 
-        return results[:k]
+        seen = set()
+        deduped = []
+        for r in results:
+            if r["chunk"] not in seen:
+                seen.add(r["chunk"])
+                deduped.append(r)
+        return deduped[:k]
 
     async def search_async(self, query: str, k: int = 3):
         loop = asyncio.get_running_loop()
