@@ -10,10 +10,11 @@ from repository import VectorRepository
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a helpful assistant. Answer ONLY the user's question based on the provided context.
-Do not address any other questions, phrases, or text fragments that appear in the context.
-Do not list what you cannot answer. If the context contains enough information, provide a very long, thorough, detailed answer with examples and explanations. If not, say so clearly.
-Do not use external knowledge or general information about topics not in the context. Write at least several paragraphs."""
+SYSTEM_PROMPT = """You have no knowledge of your own. Every fact you know comes from the context below. You cannot recognize or identify any person, song, place, or thing that is not explicitly named in the context.
+Your answer must be ENTIRELY based on the context. Quote or paraphrase only what the context says.
+If the context does not contain enough information to answer the question, respond ONLY with: I don't know.
+Do not add any introduction, explanation, or commentary about what you can or cannot find. Just answer the question or say I don't know.
+Correct obvious typos in the source text. Provide a very long, thorough, detailed answer if the context supports it."""
 
 class RAGService:
     def __init__(

@@ -1,11 +1,21 @@
 import asyncio
+import atexit
 import gc
 import json
 import logging
+import os
 import pickle
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+# Force joblib to use threading backend to avoid loky shared-memory semaphore leaks
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="multiprocessing.resource_tracker")
+import joblib
+joblib.parallel_config(backend="threading", n_jobs=1).__enter__()
 
 import faiss
 import numpy as np
@@ -29,9 +39,10 @@ class VectorRepository:
         with open(self.index_dir / "metadata.pkl", "rb") as f:
             self.metadata = pickle.load(f)
 
-        self.embedder = SentenceTransformer(embed_model, local_files_only=True)
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._lock = threading.Lock()
+        self.embedder = SentenceTransformer(embed_model, local_files_only=True)
+        atexit.register(self._cleanup)
 
         deleted_path = self.index_dir / "deleted_uploads.json"
         if deleted_path.exists():
@@ -57,6 +68,16 @@ class VectorRepository:
                 1 for m in self.metadata
                 if not (m.get("uploaded") and m.get("source", "") in self._deleted_uploads)
             )
+
+    def _cleanup(self):
+        self._executor.shutdown(wait=True)
+        try:
+            from joblib.externals.loky import get_reusable_executor
+            e = get_reusable_executor()
+            if e is not None:
+                e.shutdown(wait=True)
+        except Exception:
+            pass
 
     def _save_deleted(self):
         with open(self.index_dir / "deleted_uploads.json", "w") as f:
@@ -138,9 +159,42 @@ class VectorRepository:
 
     MIN_CHUNK_LEN = 30
 
-    def search(self, query: str, k: int = 3):
+    @staticmethod
+    def _extract_key_terms(query: str) -> list[str]:
+        words = re.findall(r"[a-zA-Z][a-zA-Z0-9+#_.-]+", query)
+        stopwords = {"the", "what", "how", "why", "when", "where", "which", "this", "that", "with", "from", "have", "does", "is", "do", "can", "are", "its", "for", "all", "not", "but", "was", "has", "had", "you", "we", "they", "tell", "give", "list", "name", "describe", "explain", "define", "mean", "about"}
+        return [w for w in words if len(w) > 2 and w.lower() not in stopwords]
+
+    def _keyword_fallback(self, query: str, key_terms: list[str], k: int) -> list[dict]:
         q_emb = self.embed_query(query)
-        scores, indices = self.index.search(q_emb.astype(np.float32), k)
+        candidates = []
+        for idx, (chunk, meta) in enumerate(zip(self.chunks, self.metadata)):
+            lowered = chunk.lower()
+            if not any(term.lower() in lowered for term in key_terms):
+                continue
+            if meta.get("uploaded") and meta.get("source", "") in self._deleted_uploads:
+                continue
+            if len(chunk.strip()) < self.MIN_CHUNK_LEN:
+                continue
+            vec = self.index.reconstruct(idx)
+            score = float(q_emb[0] @ vec)
+            candidates.append({
+                "score": score,
+                "chunk": chunk,
+                "metadata": meta,
+                "index": idx,
+            })
+        candidates.sort(key=lambda x: x["score"], reverse=True)
+        logger.info("keyword_fallback: found %d candidates for %s", len(candidates), key_terms)
+        return candidates[:k]
+
+    def search(self, query: str, k: int = 3):
+        key_terms = self._extract_key_terms(query)
+        expanded = query + " " + " ".join(key_terms * 3)
+        q_emb = self.embed_query(expanded)
+
+        search_k = max(k * 4, 50)
+        scores, indices = self.index.search(q_emb.astype(np.float32), search_k)
 
         results = []
         for score, idx in zip(scores[0], indices[0]):
@@ -152,14 +206,27 @@ class VectorRepository:
             chunk = self.chunks[idx]
             if len(chunk.strip()) < self.MIN_CHUNK_LEN:
                 continue
+            lowered = chunk.lower()
+            bonus = 0.0
+            for term in key_terms:
+                if term.lower() in lowered:
+                    bonus += 0.15
             results.append({
-                "score": float(score),
+                "score": float(score) + bonus,
                 "chunk": chunk,
                 "metadata": meta,
                 "index": int(idx),
+                "bonus": bonus,
             })
 
-        return results
+        results.sort(key=lambda r: r["score"], reverse=True)
+
+        if key_terms and not any(r.get("bonus", 0) > 0 for r in results[:k]):
+            logger.info("Primary search missed key terms %s for query '%s', falling back to keyword scan", key_terms, query)
+            fallback = self._keyword_fallback(expanded, key_terms, k)
+            return fallback
+
+        return results[:k]
 
     async def search_async(self, query: str, k: int = 3):
         loop = asyncio.get_running_loop()
