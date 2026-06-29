@@ -67,7 +67,6 @@ class RAGService:
         ]
 
         self.repository.add_vectors(chunks, metadatas)
-        self.repository.undelete_upload(pdf_path.name)
 
         logger.info("Uploaded PDF '%s': %s chunks, %s pages", pdf_path.name, len(chunks), len(pages_text))
         return {"filename": pdf_path.name, "chunks": len(chunks), "pages": len(pages_text)}

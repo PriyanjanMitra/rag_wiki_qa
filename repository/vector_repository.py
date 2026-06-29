@@ -46,10 +46,16 @@ class VectorRepository:
 
         deleted_path = self.index_dir / "deleted_uploads.json"
         if deleted_path.exists():
+            logger.info("Migrating legacy deleted_uploads.json: removing tombstoned PDFs from index")
             with open(deleted_path) as f:
-                self._deleted_uploads: set[str] = set(json.load(f))
-        else:
-            self._deleted_uploads: set[str] = set()
+                tombstoned: set[str] = set(json.load(f))
+            indices_to_keep = [
+                i for i, m in enumerate(self.metadata)
+                if not (m.get("uploaded") and m.get("source", "") in tombstoned)
+            ]
+            self._rebuild_index(indices_to_keep)
+            deleted_path.unlink()
+            logger.info("Legacy tombstone migration complete: %d chunks remaining", self.index.ntotal)
 
         logger.info("Repository loaded: %s chunks, dim=%s", self.index.ntotal, self.index.d)
 
@@ -63,11 +69,7 @@ class VectorRepository:
 
     @property
     def active_size(self) -> int:
-        with self._lock:
-            return sum(
-                1 for m in self.metadata
-                if not (m.get("uploaded") and m.get("source", "") in self._deleted_uploads)
-            )
+        return self.index.ntotal
 
     def _cleanup(self):
         self._executor.shutdown(wait=True)
@@ -79,9 +81,17 @@ class VectorRepository:
         except Exception:
             pass
 
-    def _save_deleted(self):
-        with open(self.index_dir / "deleted_uploads.json", "w") as f:
-            json.dump(list(self._deleted_uploads), f)
+    def _rebuild_index(self, keep_indices: list[int]):
+        if keep_indices:
+            vecs = np.vstack([self.index.reconstruct(int(i)) for i in keep_indices])
+            new_index = faiss.IndexFlatIP(self.index.d)
+            new_index.add(vecs.astype(np.float32))
+        else:
+            new_index = faiss.IndexFlatIP(self.index.d)
+        self.index = new_index
+        self.chunks = [self.chunks[i] for i in keep_indices]
+        self.metadata = [self.metadata[i] for i in keep_indices]
+        self._persist()
 
     def embed_query(self, text: str) -> np.ndarray:
         return self.embedder.encode([text], normalize_embeddings=True)
@@ -115,27 +125,30 @@ class VectorRepository:
             pickle.dump(self.chunks, f)
         with open(self.index_dir / "metadata.pkl", "wb") as f:
             pickle.dump(self.metadata, f)
+        config_path = self.index_dir / "config.json"
+        if config_path.exists():
+            with open(config_path) as f:
+                cfg = json.load(f)
+            cfg["num_chunks"] = len(self.chunks)
+            with open(config_path, "w") as f:
+                json.dump(cfg, f, indent=2)
 
     def delete_upload(self, filename: str) -> dict:
         with self._lock:
-            count = sum(
-                1 for m in self.metadata
+            match_idx = [
+                i for i, m in enumerate(self.metadata)
                 if m.get("uploaded") and m.get("source") == filename
-            )
-            if count == 0:
+            ]
+            if not match_idx:
                 return {"filename": filename, "removed": 0, "error": "File not found in index"}
 
-            self._deleted_uploads.add(filename)
-            self._save_deleted()
-            logger.info("Deleted upload '%s': %s chunks removed", filename, count)
+            match_set = set(match_idx)
+            keep_idx = [i for i in range(len(self.metadata)) if i not in match_set]
+            count = len(match_idx)
+            self._rebuild_index(keep_idx)
+            logger.info("Deleted upload '%s': %s chunks removed (rebuilt index: %s total)",
+                        filename, count, self.index.ntotal)
             return {"filename": filename, "removed": count}
-
-    def undelete_upload(self, filename: str):
-        with self._lock:
-            if filename in self._deleted_uploads:
-                self._deleted_uploads.discard(filename)
-                self._save_deleted()
-                logger.info("Undeleted upload '%s'", filename)
 
     def list_uploads(self) -> list[dict]:
         seen: set[str] = set()
@@ -144,7 +157,7 @@ class VectorRepository:
             if not m.get("uploaded"):
                 continue
             src = m.get("source", "unknown")
-            if src in seen or src in self._deleted_uploads:
+            if src in seen:
                 continue
             seen.add(src)
             uploads.append({
@@ -171,8 +184,6 @@ class VectorRepository:
         for idx, (chunk, meta) in enumerate(zip(self.chunks, self.metadata)):
             lowered = chunk.lower()
             if not any(term.lower() in lowered for term in key_terms):
-                continue
-            if meta.get("uploaded") and meta.get("source", "") in self._deleted_uploads:
                 continue
             if len(chunk.strip()) < self.MIN_CHUNK_LEN:
                 continue
@@ -201,8 +212,6 @@ class VectorRepository:
             if idx < 0:
                 continue
             meta = self.metadata[idx]
-            if meta.get("uploaded") and meta.get("source", "") in self._deleted_uploads:
-                continue
             chunk = self.chunks[idx]
             if len(chunk.strip()) < self.MIN_CHUNK_LEN:
                 continue

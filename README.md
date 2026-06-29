@@ -269,9 +269,9 @@ index is persisted to disk immediately so it survives a server restart.
 
 ### DELETE /upload/{filename}
 
-Removes an uploaded PDF and all its chunks from the index. Deleted chunks are
-filtered out of search results immediately. The deletion is persisted in
-`index/deleted_uploads.json` and survives restarts.
+Removes an uploaded PDF and all its chunks from the index. The matching
+vectors, chunks, and metadata are physically deleted from the FAISS index
+and persisted files immediately — no tombstone file is kept.
 
 ```bash
 curl -X DELETE "http://localhost:8000/upload/mybook.pdf"
