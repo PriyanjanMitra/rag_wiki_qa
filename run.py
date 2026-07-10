@@ -21,6 +21,14 @@ def cleanup(*_):
 signal.signal(signal.SIGINT, cleanup)
 signal.signal(signal.SIGTERM, cleanup)
 
+ollama = subprocess.Popen(
+    ["ollama", "serve"],
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+)
+procs.append(ollama)
+time.sleep(3)
+subprocess.run(["ollama", "pull", "llama3.2"], capture_output=True)
+
 backend = subprocess.Popen(
     [sys.executable, "-m", "uvicorn", "route.api:app", "--host", "0.0.0.0", "--port", "8000"],
     cwd=BASE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -28,7 +36,7 @@ backend = subprocess.Popen(
 procs.append(backend)
 
 frontend = subprocess.Popen(
-    ["npm", "run", "preview"],
+    ["npm", "run", "dev"],
     cwd=os.path.join(BASE, "frontend"),
     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
 )

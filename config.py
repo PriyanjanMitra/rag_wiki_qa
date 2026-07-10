@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 
@@ -8,7 +9,7 @@ class Config:
     index_dir: Path = Path("index")
     embed_model: str = "distiluse-base-multilingual-cased-v2"
 
-    ollama_url: str = "http://localhost:11434"
+    ollama_url: str = os.environ.get("OLLAMA_URL", "http://localhost:11434")
     ollama_model: str = "llama3.2"
     top_k: int = 7
 
