@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY config.py .
+COPY GateBooks/ GateBooks/
 COPY route/ route/
 COPY pipeline/ pipeline/
 COPY service/ service/
@@ -13,4 +14,7 @@ COPY repository/ repository/
 
 EXPOSE 8000
 
-CMD ["python", "-m", "uvicorn", "route.api:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY backend-start.sh .
+RUN chmod +x backend-start.sh
+
+CMD ["./backend-start.sh"]

@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: backend
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: backend
@@ -24,11 +24,16 @@ spec:
         volumeMounts:
         - name: hf-cache
           mountPath: /root/.cache/huggingface
+        - name: index-data
+          mountPath: /app/index
       volumes:
       - name: hf-cache
         hostPath:
           path: /tmp/huggingface
           type: DirectoryOrCreate
+      - name: index-data
+        persistentVolumeClaim:
+          claimName: rag-index
 ---
 apiVersion: v1
 kind: Service
@@ -39,3 +44,14 @@ spec:
     app: backend
   ports:
   - port: 8000
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rag-index
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
