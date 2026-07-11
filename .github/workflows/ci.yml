@@ -24,7 +24,7 @@ jobs:
         pip install -r requirements.txt
 
     - name: Check Python syntax
-      run: python -m py_compile config.py backend-start.sh
+      run: python -m py_compile config.py
       continue-on-error: true
 
   frontend:
