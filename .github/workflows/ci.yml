@@ -24,7 +24,7 @@ jobs:
         pip install -r requirements.txt
 
     - name: Check Python syntax
-      run: python -m py_compile run.py config.py
+      run: python -m py_compile config.py backend-start.sh
       continue-on-error: true
 
   frontend:
@@ -74,16 +74,6 @@ jobs:
         registry: ghcr.io
         username: ${{ github.repository_owner }}
         password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Build and push monolithic image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: Dockerfile
-        push: ${{ github.ref == 'refs/heads/master' }}
-        tags: ghcr.io/${{ env.REPO }}:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
 
     - name: Build and push backend image
       uses: docker/build-push-action@v6

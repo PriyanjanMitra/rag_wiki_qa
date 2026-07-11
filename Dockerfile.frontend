@@ -9,6 +9,6 @@ COPY frontend/ .
 
 RUN npm run build
 
-EXPOSE 5173
+EXPOSE 4173
 
 CMD ["npx", "vite", "preview", "--host", "0.0.0.0"]

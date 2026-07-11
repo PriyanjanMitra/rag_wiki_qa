@@ -14,23 +14,16 @@ spec:
     spec:
       containers:
       - name: backend
-        image: rag_wiki_qa_backend
-        imagePullPolicy: IfNotPresent
+        image: ghcr.io/priyanjanmitra/rag_wiki_qa-backend:latest
         ports:
         - containerPort: 8000
         env:
         - name: OLLAMA_URL
           value: "http://ollama:11434"
         volumeMounts:
-        - name: hf-cache
-          mountPath: /root/.cache/huggingface
         - name: index-data
           mountPath: /app/index
       volumes:
-      - name: hf-cache
-        hostPath:
-          path: /tmp/huggingface
-          type: DirectoryOrCreate
       - name: index-data
         persistentVolumeClaim:
           claimName: rag-index

@@ -14,8 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: rag_wiki_qa_frontend
-        imagePullPolicy: IfNotPresent
+        image: ghcr.io/priyanjanmitra/rag_wiki_qa-frontend:latest
         ports:
         - containerPort: 4173
 ---
