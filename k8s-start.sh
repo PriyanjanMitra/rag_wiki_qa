@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-export PATH="$HOME/.local/bin:$PATH"
+kubectl() { minikube kubectl -- "$@"; }
 
 if ! minikube status >/dev/null 2>&1; then
     echo "Starting minikube..."
