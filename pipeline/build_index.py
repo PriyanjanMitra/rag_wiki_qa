@@ -14,7 +14,10 @@ from pipeline.pdf_loader import load_pdfs
 if __name__ == "__main__":
     hf_token = os.environ.get("HF_TOKEN") or config.hf_token
     if not hf_token:
-        hf_token = input("Enter HuggingFace token (HF_TOKEN): ").strip()
+        try:
+            hf_token = input("Enter HuggingFace token (HF_TOKEN): ").strip()
+        except (EOFError, OSError):
+            hf_token = ""
         if not hf_token:
             print("No token provided. Proceeding without authentication.")
             hf_token = None
