@@ -1,0 +1,9 @@
+{
+  "embed_model": "distiluse-base-multilingual-cased-v2",
+  "chunk_size": 512,
+  "chunk_overlap": 64,
+  "index_type": "IndexFlatIP",
+  "dimension": 512,
+  "num_chunks": 40092,
+  "normalized": true
+}

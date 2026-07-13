@@ -14,6 +14,8 @@ COPY repository/ repository/
 
 EXPOSE 8000
 
+COPY index/ index-seed/
+
 COPY backend-start.sh .
 RUN chmod +x backend-start.sh
 
