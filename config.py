@@ -7,7 +7,7 @@ class Config:
     port: int = 8000
 
     index_dir: Path = Path("index")
-    embed_model: str = "distiluse-base-multilingual-cased-v2"
+    embed_model: str = "all-MiniLM-L6-v2"
 
     ollama_url: str = os.environ.get("OLLAMA_URL", "http://localhost:11434")
     ollama_model: str = "llama3.2"
@@ -16,9 +16,13 @@ class Config:
     pdf_dir: Path = Path("GateBooks")
     chunk_size: int = 512
     chunk_overlap: int = 64
-    batch_size: int = 16
+    batch_size: int = 128
 
     hf_token: str | None = None
+
+    langfuse_secret_key: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_host: str = "http://langfuse:3000"
 
 
 config = Config()

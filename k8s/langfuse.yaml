@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse
+  template:
+    metadata:
+      labels:
+        app: langfuse
+    spec:
+      containers:
+      - name: langfuse
+        image: ghcr.io/langfuse/langfuse:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: langfuse
+              key: database-url
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: langfuse
+              key: nextauth-secret
+        - name: NEXTAUTH_URL
+          value: "http://langfuse:3000"
+        - name: SALT
+          valueFrom:
+            secretKeyRef:
+              name: langfuse
+              key: salt
+        - name: TELEMETRY_ENABLED
+          value: "false"
+        - name: LANGFUSE_ENABLE_EXPORT
+          value: "true"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse
+spec:
+  selector:
+    app: langfuse
+  ports:
+  - port: 3000

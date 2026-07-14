@@ -4,6 +4,7 @@ from pathlib import Path
 import httpx
 import pymupdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langfuse.decorators import langfuse_context, observe
 
 from config import config
 from repository import VectorRepository
@@ -104,6 +105,7 @@ Answer:"""
             ],
         }
 
+    @observe(name="rag_ask", as_type="span")
     async def ask_async(self, question: str) -> dict:
         results = await self.repository.search_async(question, k=self.top_k)
 
@@ -129,7 +131,26 @@ Answer:"""
                 json={"model": self.ollama_model, "prompt": prompt, "stream": False, "options": {"num_predict": 2048}},
             )
             response.raise_for_status()
-            answer = response.json()["response"]
+            body = response.json()
+            answer = body["response"]
+
+        langfuse_context.update_current_trace(
+            input=question,
+            output=answer,
+            metadata={"sources": list({r["metadata"].get("source", "unknown") for r in results})},
+        )
+        langfuse_context.generation(
+            name="ollama",
+            model=self.ollama_model,
+            input=prompt,
+            output=answer,
+            usage={"input": len(prompt.split()), "output": len(answer.split())},
+            metadata={
+                "model": self.ollama_model,
+                "chunks_retrieved": len(results),
+                "top_k": self.top_k,
+            },
+        )
 
         return {
             "answer": answer,
