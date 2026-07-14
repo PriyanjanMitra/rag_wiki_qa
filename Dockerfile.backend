@@ -16,7 +16,7 @@ EXPOSE 8000
 
 COPY index/ index-seed/
 
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('distiluse-base-multilingual-cased-v2')"
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 COPY backend-start.sh .
 RUN chmod +x backend-start.sh

@@ -47,7 +47,7 @@ class VectorRepository:
 
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._lock = threading.Lock()
-        self.embedder = SentenceTransformer(embed_model, local_files_only=True)
+        self.embedder = SentenceTransformer(embed_model)
         atexit.register(self._cleanup)
 
         deleted_path = self.index_dir / "deleted_uploads.json"
