@@ -27,7 +27,7 @@ EMBED_BATCH_SIZE = 16
 
 
 class VectorRepository:
-    def __init__(self, index_dir: str | Path, embed_model: str = "all-MiniLM-L6-v2"):
+    def __init__(self, index_dir: str | Path, embed_model: str | None = None):
         self.index_dir = Path(index_dir)
         logger.info("Loading FAISS index from %s", self.index_dir)
 
@@ -38,6 +38,12 @@ class VectorRepository:
 
         with open(self.index_dir / "metadata.pkl", "rb") as f:
             self.metadata = pickle.load(f)
+
+        config_path = self.index_dir / "config.json"
+        if embed_model is None and config_path.exists():
+            with open(config_path) as f:
+                embed_model = json.load(f).get("embed_model", "all-MiniLM-L6-v2")
+        embed_model = embed_model or "all-MiniLM-L6-v2"
 
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._lock = threading.Lock()

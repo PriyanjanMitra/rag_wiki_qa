@@ -29,7 +29,7 @@ class RAGService:
     ):
         self.repository = VectorRepository(
             index_dir or config.index_dir,
-            embed_model or config.embed_model,
+            embed_model,  # None = read from index config.json
         )
         self.ollama_url = (ollama_url or config.ollama_url).rstrip("/")
         self.ollama_model = ollama_model or config.ollama_model
