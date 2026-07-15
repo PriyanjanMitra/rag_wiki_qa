@@ -37,7 +37,7 @@ spec:
               name: langfuse
               key: nextauth-secret
         - name: NEXTAUTH_URL
-          value: "http://langfuse:3000"
+          value: "http://localhost:3000"
         - name: SALT
           valueFrom:
             secretKeyRef:
