@@ -34,16 +34,28 @@ kubectl apply -f k8s/ingress.yaml 2>/dev/null || \
   echo "  (ingress will be applied once the webhook is available)"
 
 echo ""
-echo "Waiting for pods (first run downloads models, may take a few minutes)..."
-echo "  Use Ctrl+C to skip wait — pods will continue in background."
-kubectl wait --for=condition=Ready --timeout=900s pods --all 2>/dev/null || \
-  echo "  Not all pods ready yet — check with: minikube kubectl -- get pods"
+echo "Waiting for core app pods (first run downloads models)..."
+echo "  Use Ctrl+C to skip — pods continue in background."
+kubectl wait --for=condition=Ready --timeout=300s pod -l app=backend 2>/dev/null || \
+  echo "  Backend not ready yet — check: minikube kubectl -- get pods"
+kubectl wait --for=condition=Ready --timeout=60s pod -l app=frontend 2>/dev/null || \
+  echo "  Frontend not ready yet"
+kubectl wait --for=condition=Ready --timeout=600s pod -l app=ollama 2>/dev/null || \
+  echo "  Ollama not ready yet — check: minikube kubectl -- get pods"
 
 echo ""
 echo "======================================"
 echo "App is ready at: http://$(minikube ip)/"
 echo ""
-echo "Langfuse tracing:"
-echo "  minikube kubectl -- port-forward svc/langfuse 3000:3000"
-echo "  Then open http://localhost:3000"
+echo "Langfuse: deploy + port-forward to inject API keys"
+echo "  1. minikube kubectl -- port-forward svc/langfuse 3000:3000"
+echo "  2. Open http://localhost:3000 → create project → get API keys"
+echo "  3. Run the command it prints below"
+echo ""
+echo "To backfill old traces, port-forward is enough — tracing starts"
+echo "as soon as keys are set:"
+echo "  minikube kubectl -- set env deployment/backend \\"
+echo "    LANGFUSE_SECRET_KEY=sk-lf-... \\"
+echo "    LANGFUSE_PUBLIC_KEY=pk-lf-... \\"
+echo "    LANGFUSE_HOST=http://langfuse:3000"
 echo "======================================"
