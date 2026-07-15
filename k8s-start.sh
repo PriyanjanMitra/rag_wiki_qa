@@ -32,6 +32,12 @@ kubectl wait --namespace ingress-nginx \
 echo "Applying ingress..."
 kubectl apply -f k8s/ingress.yaml 2>/dev/null || \
   echo "  (ingress will be applied once the webhook is available)"
+kubectl apply -f k8s/langfuse-ingress.yaml 2>/dev/null || \
+  echo "  (langfuse ingress will be applied once the webhook is available)"
+
+echo ""
+echo "Setting Langfuse URL via ingress route..."
+kubectl set env deployment/langfuse NEXTAUTH_URL=http://$(minikube ip)/langfuse
 
 echo ""
 echo "Waiting for core app pods (first run downloads models)..."
@@ -47,13 +53,10 @@ echo ""
 echo "======================================"
 echo "App is ready at: http://$(minikube ip)/"
 echo ""
-echo "Langfuse: deploy + port-forward to inject API keys"
-echo "  1. minikube kubectl -- port-forward svc/langfuse 3000:3000"
-echo "  2. Open http://localhost:3000 → create project → get API keys"
-echo "  3. Run the command it prints below"
+echo "Langfuse UI:  http://$(minikube ip)/langfuse/"
+echo "  → create a project → get API keys"
 echo ""
-echo "To backfill old traces, port-forward is enough — tracing starts"
-echo "as soon as keys are set:"
+echo "Inject API keys into backend to start tracing:"
 echo "  minikube kubectl -- set env deployment/backend \\"
 echo "    LANGFUSE_SECRET_KEY=sk-lf-... \\"
 echo "    LANGFUSE_PUBLIC_KEY=pk-lf-... \\"
