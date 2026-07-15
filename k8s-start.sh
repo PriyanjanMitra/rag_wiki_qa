@@ -36,8 +36,8 @@ kubectl apply -f k8s/langfuse-ingress.yaml 2>/dev/null || \
   echo "  (langfuse ingress will be applied once the webhook is available)"
 
 echo ""
-echo "Setting Langfuse URL via ingress route..."
-kubectl set env deployment/langfuse NEXTAUTH_URL=http://$(minikube ip)/langfuse
+echo "Setting Langfuse URL for host-based ingress..."
+kubectl set env deployment/langfuse NEXTAUTH_URL=http://langfuse.local
 
 echo ""
 echo "Waiting for core app pods (first run downloads models)..."
@@ -53,8 +53,11 @@ echo ""
 echo "======================================"
 echo "App is ready at: http://$(minikube ip)/"
 echo ""
-echo "Langfuse UI:  http://$(minikube ip)/langfuse/"
-echo "  → create a project → get API keys"
+LANGFUSE_IP=$(minikube ip)
+echo "Langfuse UI:  http://langfuse.local/"
+echo "  Add this to /etc/hosts first:"
+echo "  echo '$LANGFUSE_IP langfuse.local' | sudo tee -a /etc/hosts"
+echo "  Then open http://langfuse.local → create project → get API keys"
 echo ""
 echo "Inject API keys into backend to start tracing:"
 echo "  minikube kubectl -- set env deployment/backend \\"
