@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/github/stars/PriyanjanMitra/rag_wiki_qa?style=for-the-badge&logo=github&color=ffd700" alt="stars" />
   <img src="https://img.shields.io/github/forks/PriyanjanMitra/rag_wiki_qa?style=for-the-badge&logo=github&color=58a6ff" alt="forks" />
   <img src="https://img.shields.io/github/license/PriyanjanMitra/rag_wiki_qa?style=for-the-badge&color=7c3aed" alt="license" />
-  <img src="https://img.shields.io/badge/python-3.10+-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="python" />
+  <img src="https://img.shields.io/badge/python-3.13-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="python" />
   <img src="https://img.shields.io/badge/node-18+-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="node" />
   <img src="https://img.shields.io/badge/react-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="react" />
   <img src="https://img.shields.io/badge/typescript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="typescript" />
@@ -97,7 +97,7 @@ Incremental upload (runtime):
 
 ## Prerequisites
 
-- **Python 3.10+**
+- **Python 3.13+**
 - **Node.js 18+** and **npm**
 - **Ollama** with a model pulled (e.g., `llama3.2`)
 
@@ -196,14 +196,18 @@ All settings in `config.py`:
 | `host` | `0.0.0.0` | Backend bind address |
 | `port` | `8000` | Backend port |
 | `index_dir` | `index/` | FAISS index directory |
-| `embed_model` | `distiluse-base-multilingual-cased-v2` | SentenceTransformer model for embeddings |
-| `ollama_url` | `http://localhost:11434` | Ollama server URL |
+| `embed_model` | `all-MiniLM-L6-v2` | SentenceTransformer model for embeddings (384-dim) |
+| `ollama_url` | `http://localhost:11434` | Ollama server URL (overridable via `OLLAMA_URL` env var) |
 | `ollama_model` | `llama3.2` | Ollama model for generation |
 | `top_k` | `7` | Number of chunks to retrieve |
 | `pdf_dir` | `GateBooks/` | PDF textbooks directory |
 | `chunk_size` | `512` | Chunk size (characters) |
 | `chunk_overlap` | `64` | Chunk overlap (characters) |
-| `batch_size` | `16` | Embedding batch size |
+| `batch_size` | `128` | Embedding batch size (pipeline) |
+| `hf_token` | `None` | HuggingFace token (optional) |
+| `langfuse_secret_key` | `None` | Langfuse secret key (optional tracing) |
+| `langfuse_public_key` | `None` | Langfuse public key |
+| `langfuse_host` | `http://langfuse:3000` | Langfuse host URL |
 
 ## Project Structure
 
@@ -220,7 +224,13 @@ rag_wiki_qa/
 │   ├── backend-deploy.yaml
 │   ├── frontend-deploy.yaml
 │   ├── ollama-deploy.yaml
-│   └── ingress.yaml
+│   ├── ingress.yaml
+│   ├── langfuse.yaml              # Langfuse app
+│   ├── langfuse-db.yaml           # PostgreSQL for Langfuse
+│   ├── langfuse-clickhouse.yaml   # ClickHouse for Langfuse
+│   ├── langfuse-zookeeper.yaml    # ZooKeeper for ClickHouse
+│   ├── langfuse-ingress.yaml      # Langfuse host-based ingress
+│   └── langfuse-secret.yaml       # Dev secrets for Langfuse
 ├── k8s-start.sh              # Minikube launcher (start + deploy)
 ├── k8s-stop.sh               # Minikube stopper (delete + stop)
 │
@@ -230,15 +240,16 @@ rag_wiki_qa/
 │
 ├── route/
 │   ├── __init__.py
-│   └── api.py                # FastAPI routes (health, ask, upload, search)
+│   └── api.py                # FastAPI routes (health, ask, upload, uploads)
 │
 ├── service/
 │   ├── __init__.py
-│   └── rag_service.py        # RAG orchestration (retrieve + LLM generate)
+│   ├── rag_service.py        # RAG orchestration (retrieve + LLM generate)
+│   └── langfuse_client.py    # Langfuse tracing singleton
 │
 ├── repository/
 │   ├── __init__.py
-│   └── vector_repository.py  # FAISS index load/search + embeddings
+│   └── vector_repository.py  # FAISS CRUD + embedding + keyword fallback
 │
 ├── pipeline/
 │   ├── __init__.py
@@ -253,21 +264,28 @@ rag_wiki_qa/
 │   ├── metadata.pkl
 │   └── config.json
 │
-├── GateBooks/                # PDF textbooks directory
+├── GateBooks/                # PDF textbooks directory (~12 PDFs)
 │
-└── frontend/                 # Vite + React + Tailwind CSS
-    ├── package.json
-    ├── tsconfig.json
-    ├── vite.config.ts
-    ├── env.d.ts               # @tailwindcss/vite module declaration
-    ├── public/
-    │   └── favicon.svg        # Windows 7 Aero glass SVG (theme-aware)
-    └── src/
-        ├── main.tsx           # React entry point
-        ├── App.tsx            # Main UI component
-        ├── App.css            # Tailwind import + @custom-variant dark
-        ├── api.ts             # API client (fetch + FormData upload)
-        └── vite-env.d.ts      # TypeScript declarations
+├── frontend/                 # Vite + React + Tailwind CSS
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── vite.config.ts
+│   ├── env.d.ts               # @tailwindcss/vite module declaration
+│   ├── public/
+│   │   └── favicon.svg        # Windows 7 Aero glass SVG (theme-aware)
+│   └── src/
+│       ├── main.tsx           # React entry point
+│       ├── App.tsx            # Main UI component
+│       ├── App.css            # Tailwind import + @custom-variant dark
+│       ├── api.ts             # API client (fetch + FormData upload)
+│       └── vite-env.d.ts      # TypeScript declarations
+│
+├── backend-start.sh          # Container entrypoint (builds index if missing, starts uvicorn)
+├── Dockerfile.backend        # Backend container image
+├── Dockerfile.frontend       # Frontend container image
+├── requirements.txt          # Python dependencies
+├── config.py                 # Configuration singleton
+└── main.py                   # Backend entry point (uvicorn)
 ```
 
 ## API Endpoints
@@ -386,7 +404,7 @@ stages:
 
 1. **PDF Loading** (`pdf_loader.py`) — Extracts text from each PDF using PyMuPDF, per-page.
 2. **Chunking** (`chunker_embedder.py`) — Splits each document's text into overlapping chunks (configurable size / overlap).
-3. **Embedding** (`chunker_embedder.py`) — Encodes each chunk into a vector using the configured SentenceTransformer model (default: `distiluse-base-multilingual-cased-v2`, 512-dim).
+3. **Embedding** (`chunker_embedder.py`) — Encodes each chunk into a vector using the configured SentenceTransformer model (default: `all-MiniLM-L6-v2`, 384-dim).
 4. **Indexing** (`indexer.py`) — Builds a FAISS `IndexFlatIP` (inner product) index and saves it along with chunk text and metadata.
 
 The model, dimensions, and token are configured in `config.py` (`embed_model`, `batch_size`) and passed through from `build_index.py`.
