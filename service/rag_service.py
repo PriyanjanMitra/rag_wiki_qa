@@ -4,11 +4,8 @@ from pathlib import Path
 import httpx
 import pymupdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langfuse import observe, propagate_attributes
-
 from config import config
 from repository import VectorRepository
-from service.langfuse_client import get_langfuse
 
 logger = logging.getLogger(__name__)
 
@@ -106,20 +103,18 @@ Answer:"""
             ],
         }
 
-    @observe(as_type="generation")
     async def ask_async(self, question: str) -> dict:
-        with propagate_attributes(trace_name=question[:200]):
-            results = await self.repository.search_async(question, k=self.top_k)
+        results = await self.repository.search_async(question, k=self.top_k)
 
-            if not results:
-                return {
-                    "answer": "I couldn't find any relevant information to answer that question.",
-                    "context": [],
-                }
+        if not results:
+            return {
+                "answer": "I couldn't find any relevant information to answer that question.",
+                "context": [],
+            }
 
-            context = "\n\n".join(r["chunk"] for r in results)
+        context = "\n\n".join(r["chunk"] for r in results)
 
-            prompt = f"""{SYSTEM_PROMPT}
+        prompt = f"""{SYSTEM_PROMPT}
 
 Context:
 {context}
@@ -127,31 +122,16 @@ Context:
 Question: {question}
 Answer:"""
 
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                response = await client.post(
-                    f"{self.ollama_url}/api/generate",
-                    json={"model": self.ollama_model, "prompt": prompt, "stream": False, "options": {"num_predict": 2048}},
-                )
-                response.raise_for_status()
-                body = response.json()
-                answer = body["response"]
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                f"{self.ollama_url}/api/generate",
+                json={"model": self.ollama_model, "prompt": prompt, "stream": False, "options": {"num_predict": 2048}},
+            )
+            response.raise_for_status()
+            body = response.json()
+            answer = body["response"]
 
-            lf = get_langfuse()
-            if lf:
-                lf.update_current_generation(
-                    name="ollama",
-                    model=self.ollama_model,
-                    input=prompt,
-                    output=answer,
-                    usage_details={"input": len(prompt.split()), "output": len(answer.split())},
-                    metadata={
-                        "model": self.ollama_model,
-                        "chunks_retrieved": len(results),
-                        "top_k": self.top_k,
-                    },
-                )
-
-            return {
+        return {
             "answer": answer,
             "context": [
                 {

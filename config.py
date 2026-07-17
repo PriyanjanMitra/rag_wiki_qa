@@ -20,9 +20,5 @@ class Config:
 
     hf_token: str | None = None
 
-    langfuse_secret_key: str | None = None
-    langfuse_public_key: str | None = None
-    langfuse_host: str = "http://langfuse:3000"
-
 
 config = Config()

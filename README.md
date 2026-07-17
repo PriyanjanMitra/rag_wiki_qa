@@ -205,9 +205,6 @@ All settings in `config.py`:
 | `chunk_overlap` | `64` | Chunk overlap (characters) |
 | `batch_size` | `128` | Embedding batch size (pipeline) |
 | `hf_token` | `None` | HuggingFace token (optional) |
-| `langfuse_secret_key` | `None` | Langfuse secret key (optional tracing) |
-| `langfuse_public_key` | `None` | Langfuse public key |
-| `langfuse_host` | `http://langfuse:3000` | Langfuse host URL |
 
 ## Project Structure
 
@@ -225,12 +222,7 @@ rag_wiki_qa/
 │   ├── frontend-deploy.yaml
 │   ├── ollama-deploy.yaml
 │   ├── ingress.yaml
-│   ├── langfuse.yaml              # Langfuse app
-│   ├── langfuse-db.yaml           # PostgreSQL for Langfuse
-│   ├── langfuse-clickhouse.yaml   # ClickHouse for Langfuse
-│   ├── langfuse-zookeeper.yaml    # ZooKeeper for ClickHouse
-│   ├── langfuse-ingress.yaml      # Langfuse host-based ingress
-│   └── langfuse-secret.yaml       # Dev secrets for Langfuse
+
 ├── k8s-start.sh              # Minikube launcher (start + deploy)
 ├── k8s-stop.sh               # Minikube stopper (delete + stop)
 │
@@ -244,8 +236,7 @@ rag_wiki_qa/
 │
 ├── service/
 │   ├── __init__.py
-│   ├── rag_service.py        # RAG orchestration (retrieve + LLM generate)
-│   └── langfuse_client.py    # Langfuse tracing singleton
+│   └── rag_service.py        # RAG orchestration (retrieve + LLM generate)
 │
 ├── repository/
 │   ├── __init__.py
