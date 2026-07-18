@@ -12,6 +12,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white" alt="fastapi" />
+  <img src="https://img.shields.io/badge/DSPy-6B32E1?style=for-the-badge&logo=&logoColor=white" alt="dspy" />
   <img src="https://img.shields.io/badge/FAISS-%2300C7B7.svg?style=for-the-badge&logo=faiss&logoColor=white" alt="faiss" />
   <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="tailwind" />
   <img src="https://img.shields.io/badge/sentence--transformers-FF6F00?style=for-the-badge&logo=huggingface&logoColor=white" alt="sentence-transformers" />
@@ -23,7 +24,7 @@
   <img src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white" alt="github-actions" />
 </p>
 
-A local Retrieval-Augmented Generation (RAG) system that answers questions from PDF textbooks using FAISS vector search and Ollama LLMs.
+A local Retrieval-Augmented Generation (RAG) system that answers questions from PDF textbooks using **DSPy** for prompt programming, FAISS vector search, and Ollama LLMs.
 
 ## Architecture
 
@@ -59,18 +60,26 @@ A local Retrieval-Augmented Generation (RAG) system that answers questions from 
 │  └───────┼─────────────┼─────────────┼────────────────────┘  │
 │          ▼             ▼             ▼                        │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │  service/rag_service.py                                │  │
-│  │  ask() → retrieve + generate                           │  │
-│  │  upload_pdf() → extract + chunk + embed + add_vectors()│  │
+│  │  service/rag_service.py                   (DSPy)       │  │
+│  │                                                         │  │
+│  │  RAGModule(dspy.Module):                                │  │
+│  │    retrieve = dspy.Retrieve(k)                          │  │
+│  │    generate = dspy.ChainOfThought(GenerateAnswer)       │  │
+│  │                                                         │  │
+│  │  upload_pdf() → extract + chunk + embed + add_vectors() │  │
 │  └──────────┬─────────────────────────────────────────────┘  │
 │             │                                                │
 │      ┌──────┴──────┐                                         │
 │      ▼             ▼                                          │
 │  ┌──────────┐  ┌──────────┐                                  │
-│  │ Vector   │  │ Ollama   │                                  │
-│  │Repository│  │ (LLM)    │                                  │
-│  │(FAISS)   │  │ Port     │                                  │
-│  │          │  │ 11434    │                                  │
+│  │ FaissRM  │  │ Ollama   │                                  │
+│  │ (DSPy    │  │ via      │                                  │
+│  │  RM)     │  │ dspy.LM  │                                  │
+│  │     │    │  │          │                                  │
+│  │     ▼    │  │          │                                  │
+│  │ Vector   │  │ Port     │                                  │
+│  │Repository│  │ 11434    │                                  │
+│  │(FAISS)   │  │          │                                  │
 │  └──────────┘  └──────────┘                                  │
 └──────────────────────────────────────────────────────────────┘
 
@@ -85,7 +94,7 @@ Incremental upload (runtime):
 
 ## Features
 
-- **RAG Q&A** — Ask questions about your PDF textbooks; retrieves relevant chunks via FAISS similarity search and generates answers using Ollama LLMs.
+- **RAG Q&A** — Ask questions about your PDF textbooks; retrieves relevant chunks via FAISS similarity search and generates answers using Ollama LLMs, orchestrated via **DSPy** modules.
 - **Source attribution** — Every answer shows which textbook and passage the information came from, with similarity scores.
 - **PDF upload** — Upload a new PDF from the frontend; it is automatically extracted, chunked, embedded, and added to the FAISS index incrementally without rebuilding. The index persists to disk immediately.
 - **Windows 7 Aero UI** — Glassmorphism design with animated background blobs, gradient title bars, themed to orange/warm in light mode and blue/cool in dark mode.
@@ -236,7 +245,7 @@ rag_wiki_qa/
 │
 ├── service/
 │   ├── __init__.py
-│   └── rag_service.py        # RAG orchestration (retrieve + LLM generate)
+│   └── rag_service.py        # DSPy-powered RAG (FaissRM, RAGModule, GenerateAnswer)
 │
 ├── repository/
 │   ├── __init__.py
@@ -399,6 +408,28 @@ stages:
 4. **Indexing** (`indexer.py`) — Builds a FAISS `IndexFlatIP` (inner product) index and saves it along with chunk text and metadata.
 
 The model, dimensions, and token are configured in `config.py` (`embed_model`, `batch_size`) and passed through from `build_index.py`.
+
+## DSPy RAG Pipeline
+
+Question answering uses **DSPy** modules instead of manual prompt construction:
+
+1. **FaissRM** — A DSPy-compatible retriever model that wraps `VectorRepository.search()`. Called by `dspy.Retrieve` internally.
+2. **GenerateAnswer** — A `dspy.Signature` defining the question-answering task with a strict source-only instruction set (replaces the old `SYSTEM_PROMPT` constant).
+3. **RAGModule** — A `dspy.Module` combining `dspy.Retrieve(k)` and `dspy.ChainOfThought(GenerateAnswer)`.
+4. **dspy.LM** — Configures the Ollama LLM as DSPy's language model backend.
+
+Request flow:
+
+```
+POST /ask  →  RAGService.ask_async()
+  →  VectorRepository.search()          (FAISS similarity + keyword boost)
+  →  FaissRM(query, k)                  (formats results as DSPy passages)
+  →  dspy.Retrieve(k).forward(query)    (DSPy retrieval step)
+  →  dspy.ChainOfThought(GenerateAnswer) (DSPy generation step)
+  →  structured answer + context
+```
+
+The `GenerateAnswer` signature enforces that the LLM answers solely from the provided context — equivalent to the old `SYSTEM_PROMPT` but managed declaratively through DSPy's signature system.
 
 Run manually:
 

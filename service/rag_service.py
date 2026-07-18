@@ -1,19 +1,57 @@
+import asyncio
 import logging
 from pathlib import Path
 
-import httpx
+import dspy
 import pymupdf
+from dspy import InputField, OutputField, Signature
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from config import config
 from repository import VectorRepository
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You have no knowledge of your own. Every fact you know comes from the context below. You cannot recognize or identify any person, song, place, or thing that is not explicitly named in the context.
-Your answer must be ENTIRELY based on the context. Synthesize the information — do not repeat the context verbatim or quote large blocks of text.
-If the context does not contain enough information to answer the question, respond ONLY with: I don't know.
-Do not add any introduction, explanation, or commentary about what you can or cannot find. Just answer the question or say I don't know.
-Correct obvious typos in the source text. Provide a very long, thorough, detailed answer if the context supports it."""
+
+class GenerateAnswer(Signature):
+    """You have no knowledge of your own. Every fact you know comes from the context below.
+Your answer must be ENTIRELY based on the context. Synthesize the information — do not
+repeat the context verbatim or quote large blocks of text.
+If the context does not contain enough information to answer the question,
+respond ONLY with: I don't know.
+Correct obvious typos in the source text. Provide a very long, thorough, detailed answer
+if the context supports it."""
+
+    context = InputField(desc="Relevant passages from textbooks with source attribution and similarity scores")
+    question = InputField()
+    answer = OutputField(desc="A thorough answer based solely on the provided context")
+
+
+class FaissRM:
+    def __init__(self, repository: VectorRepository):
+        self.repository = repository
+
+    def __call__(self, query: str, k: int = 7, **kwargs) -> list[dspy.Example]:
+        results = self.repository.search(query, k=k)
+        return [
+            dspy.Example(
+                long_text=f"[Source: {r['metadata'].get('source', 'unknown')} (score: {r['score']:.3f})]\n{r['chunk']}"
+            )
+            for r in results
+        ]
+
+
+class RAGModule(dspy.Module):
+    def __init__(self, k: int = 7):
+        super().__init__()
+        self.retrieve = dspy.Retrieve(k=k)
+        self.generate = dspy.ChainOfThought(GenerateAnswer)
+
+    def forward(self, question: str) -> dspy.Prediction:
+        passages = self.retrieve(question).passages
+        context = "\n\n".join(passages)
+        return self.generate(context=context, question=question)
+
 
 class RAGService:
     def __init__(
@@ -26,11 +64,41 @@ class RAGService:
     ):
         self.repository = VectorRepository(
             index_dir or config.index_dir,
-            embed_model,  # None = read from index config.json
+            embed_model,
         )
-        self.ollama_url = (ollama_url or config.ollama_url).rstrip("/")
-        self.ollama_model = ollama_model or config.ollama_model
-        self.top_k = top_k if top_k is not None else config.top_k
+        self._top_k = top_k if top_k is not None else config.top_k
+
+        lm = dspy.LM(
+            f"ollama/{ollama_model or config.ollama_model}",
+            api_base=(ollama_url or config.ollama_url).rstrip("/"),
+        )
+        rm = FaissRM(self.repository)
+        dspy.settings.configure(lm=lm, rm=rm)
+
+        self.dspy_rag = RAGModule(k=self._top_k)
+
+    def ask(self, question: str) -> dict:
+        results = self.repository.search(question, k=self._top_k)
+        if not results:
+            return {"answer": "I couldn't find any relevant information to answer that question.", "context": []}
+
+        pred = self.dspy_rag(question)
+
+        return {
+            "answer": pred.answer,
+            "context": [
+                {
+                    "source": r["metadata"].get("source", "unknown"),
+                    "score": r["score"],
+                    "excerpt": r["chunk"][:600],
+                }
+                for r in results
+            ],
+        }
+
+    async def ask_async(self, question: str) -> dict:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.ask, question)
 
     def upload_pdf(self, pdf_path: Path) -> dict:
         doc = pymupdf.open(str(pdf_path))
@@ -69,79 +137,6 @@ class RAGService:
 
         logger.info("Uploaded PDF '%s': %s chunks, %s pages", pdf_path.name, len(chunks), len(pages_text))
         return {"filename": pdf_path.name, "chunks": len(chunks), "pages": len(pages_text)}
-
-    def ask(self, question: str) -> dict:
-        results = self.repository.search(question, k=self.top_k)
-
-        context = "\n\n".join(r["chunk"] for r in results)
-
-        prompt = f"""{SYSTEM_PROMPT}
-
-Context:
-{context}
-
-Question: {question}
-Answer:"""
-
-        response = httpx.post(
-            f"{self.ollama_url}/api/generate",
-            json={"model": self.ollama_model, "prompt": prompt, "stream": False, "options": {"num_predict": 2048}},
-            timeout=300.0,
-        )
-        response.raise_for_status()
-        answer = response.json()["response"]
-
-        return {
-            "answer": answer,
-            "context": [
-                {
-                    "source": r["metadata"].get("source", "unknown"),
-                    "score": r["score"],
-                    "excerpt": r["chunk"][:600],
-                }
-                for r in results
-            ],
-        }
-
-    async def ask_async(self, question: str) -> dict:
-        results = await self.repository.search_async(question, k=self.top_k)
-
-        if not results:
-            return {
-                "answer": "I couldn't find any relevant information to answer that question.",
-                "context": [],
-            }
-
-        context = "\n\n".join(r["chunk"] for r in results)
-
-        prompt = f"""{SYSTEM_PROMPT}
-
-Context:
-{context}
-
-Question: {question}
-Answer:"""
-
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            response = await client.post(
-                f"{self.ollama_url}/api/generate",
-                json={"model": self.ollama_model, "prompt": prompt, "stream": False, "options": {"num_predict": 2048}},
-            )
-            response.raise_for_status()
-            body = response.json()
-            answer = body["response"]
-
-        return {
-            "answer": answer,
-            "context": [
-                {
-                    "source": r["metadata"].get("source", "unknown"),
-                    "score": r["score"],
-                    "excerpt": r["chunk"][:600],
-                }
-                for r in results
-            ],
-        }
 
     def delete_upload(self, filename: str) -> dict:
         return self.repository.delete_upload(filename)
