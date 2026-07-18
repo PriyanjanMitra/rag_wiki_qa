@@ -170,22 +170,30 @@ docker run -d --name frontend -p 4173:4173 rag-wiki-qa-frontend
 
 ### Kubernetes (Minikube)
 
+Download the two scripts and run:
+
 ```bash
-# Start cluster and deploy everything
+curl -O https://raw.githubusercontent.com/PriyanjanMitra/rag_wiki_qa/master/k8s-start.sh
+curl -O https://raw.githubusercontent.com/PriyanjanMitra/rag_wiki_qa/master/k8s-stop.sh
+chmod +x k8s-start.sh k8s-stop.sh
+
+# Deploy — you'll be prompted to pick RAG version
 ./k8s-start.sh
 
-# Stop and clean up
+# Stop (cluster can be restarted later)
 ./k8s-stop.sh
 ```
 
-`k8s-start.sh` creates a Minikube cluster, enables the ingress addon, and applies all manifests from `k8s/`. The Ollama pod auto-pulls `llama3.2` on first start.
+`k8s-start.sh` downloads all Kubernetes manifests from the repo at runtime, prompts you to choose **Manual RAG** or **DSPy RAG**, creates a Minikube cluster, deploys the backend, frontend, and Ollama pods, and waits for them to be ready. The Ollama pod auto-pulls `llama3.2` on first start. The FAISS index is pre-seeded from the Docker image and persisted via PVC.
 
 ### CI/CD
 
-The `.github/workflows/ci.yml` workflow runs on pushes and PRs to `master`:
+The `.github/workflows/ci.yml` workflow runs on pushes and PRs to `master` and `feature/dspy-rag`:
 - **Backend:** Checks Python syntax
 - **Frontend:** TypeScript check and production build
-- **Docker:** Builds and pushes `backend` and `frontend` images to `ghcr.io/priyanjanmitra/` (on push to `master` only)
+- **Docker:** Builds and pushes versioned images to `ghcr.io/priyanjanmitra/`:
+  - `master` → `:latest` and `:master`
+  - `feature/dspy-rag` → `:feature-dspy-rag`
 
 ## Configuration
 
