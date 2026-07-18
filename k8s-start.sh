@@ -1,5 +1,8 @@
 #!/bin/sh
 set -e
+
+BASE_URL="https://raw.githubusercontent.com/PriyanjanMitra/rag_wiki_qa/master/k8s"
+
 kubectl() { minikube kubectl -- "$@"; }
 
 if ! minikube status >/dev/null 2>&1; then
@@ -8,22 +11,35 @@ if ! minikube status >/dev/null 2>&1; then
     minikube addons enable ingress
 fi
 
-echo "Deploying from ghcr.io/priyanjanmitra..."
-kubectl apply -f k8s/backend-deploy.yaml
-kubectl apply -f k8s/frontend-deploy.yaml
-kubectl apply -f k8s/ollama-deploy.yaml
+echo ""
+echo "Select RAG version:"
+echo "  1) Manual RAG"
+echo "  2) DSPy RAG"
+printf "Enter choice [1]: "
+read -r choice
+case "${choice:-1}" in
+  2) TAG="feature-dspy-rag" ;;
+  *) TAG="latest" ;;
+esac
+echo "Using image tag: $TAG"
+echo ""
+
+echo "Deploying from $BASE_URL ..."
+kubectl apply -f "$BASE_URL/backend-deploy.yaml"
+kubectl apply -f "$BASE_URL/frontend-deploy.yaml"
+kubectl apply -f "$BASE_URL/ollama-deploy.yaml"
 
 echo ""
-echo "Waiting for ingress controller to be ready..."
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=300s 2>/dev/null || \
-  echo "  (continuing without ingress controller ready)"
-
 echo "Applying ingress..."
-kubectl apply -f k8s/ingress.yaml 2>/dev/null || \
+kubectl apply -f "$BASE_URL/ingress.yaml" 2>/dev/null || \
   echo "  (ingress will be applied once the webhook is available)"
+
+echo ""
+echo "Overriding image tag to $TAG ..."
+kubectl set image deployment/backend \
+  "backend=ghcr.io/priyanjanmitra/rag_wiki_qa-backend:$TAG"
+kubectl set image deployment/frontend \
+  "frontend=ghcr.io/priyanjanmitra/rag_wiki_qa-frontend:$TAG"
 
 echo ""
 echo "Waiting for core app pods (first run downloads models)..."
