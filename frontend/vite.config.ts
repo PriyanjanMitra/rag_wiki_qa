@@ -12,9 +12,17 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     proxy: {
-      "/ask": "http://localhost:8000",
+      "/ask": {
+        target: "http://localhost:8000",
+        proxyTimeout: 300_000,
+        timeout: 300_000,
+      },
       "/health": "http://localhost:8000",
-      "/upload": "http://localhost:8000",
+      "/upload": {
+        target: "http://localhost:8000",
+        proxyTimeout: 300_000,
+        timeout: 300_000,
+      },
       "/uploads": "http://localhost:8000",
     },
   },
