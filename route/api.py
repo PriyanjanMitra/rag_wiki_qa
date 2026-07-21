@@ -6,7 +6,6 @@ from urllib.parse import unquote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
-from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 from config import config
@@ -22,7 +21,6 @@ def get_service() -> RAGService:
 
 
 app = FastAPI(title="RAG Wiki QA", version="1.0.0")
-Instrumentator().instrument(app).expose(app)
 
 
 class AskRequest(BaseModel):
